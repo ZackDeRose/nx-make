@@ -1,0 +1,9 @@
+{
+  "executors": {
+    "make": {
+      "implementation": "./dist/executors/make/executor",
+      "schema": "./dist/executors/make/schema.json",
+      "description": "Execute a Make target"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "math-lib",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "examples/math-lib",
+  "projectType": "library"
+}

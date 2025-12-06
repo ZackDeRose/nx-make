@@ -1,0 +1,79 @@
+{
+  "name": "nx-make",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph",
+  "author": "Zack DeRose <zack.derose@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "nx",
+    "nx-plugin",
+    "make",
+    "makefile",
+    "build-tool"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZackDeRose/nx-make.git"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json",
+    "executors.json"
+  ],
+  "executors": "./executors.json",
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "packages/nx-make/dist",
+          "main": "packages/nx-make/src/index.ts",
+          "tsConfig": "packages/nx-make/tsconfig.lib.json",
+          "rootDir": "packages/nx-make/src",
+          "generatePackageJson": false,
+          "assets": [
+            {
+              "input": "./packages/nx-make",
+              "glob": "*.json",
+              "ignore": ["**/package.json", "**/tsconfig*.json"],
+              "output": "."
+            },
+            {
+              "input": "./packages/nx-make/src",
+              "glob": "**/!(*.ts)",
+              "output": "."
+            },
+            {
+              "input": "./packages/nx-make/src",
+              "glob": "**/*.d.ts",
+              "output": "."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@nx/devkit": "^22.1.3",
+    "tslib": "^2.3.0"
+  },
+  "peerDependencies": {
+    "nx": ">= 22.0.0"
+  }
+}

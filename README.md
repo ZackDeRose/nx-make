@@ -1,90 +1,103 @@
-# NxMake
+# nx-make
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+An Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+## Overview
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/js?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+This repository contains the source code for the `nx-make` plugin, which enables seamless integration of Make-based build systems with Nx workspaces.
 
-## Finish your CI setup
+## Features
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/jfNtMQlaaN)
+- 🔍 Automatically detects `Makefile`s in your workspace
+- 📊 Integrates Make targets into the Nx project graph
+- ⚡ Run Make targets using Nx executors
+- 🔗 Leverage Nx caching and dependency management with your Make tasks
+- 🎯 Simple configuration and setup
 
+## Installation
 
-## Generate a library
-
-```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+```bash
+npm install -D nx-make
 ```
 
-## Run tasks
-
-To build the library use:
-
-```sh
-npx nx build pkg1
+```bash
+pnpm add -D nx-make
 ```
 
-To run any task with Nx use:
-
-```sh
-npx nx <target> <project-name>
+```bash
+yarn add -D nx-make
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+## Quick Start
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+1. Add the plugin to your `nx.json`:
 
-## Versioning and releasing
-
-To version and release the library use
-
-```
-npx nx release
-```
-
-Pass `--dry-run` to see what would happen without actually releasing the library.
-
-[Learn more about Nx release &raquo;](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Keep TypeScript project references up to date
-
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
-
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
-
-```sh
-npx nx sync
+```json
+{
+  "plugins": [
+    {
+      "plugin": "nx-make"
+    }
+  ]
+}
 ```
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+2. Create a `Makefile` in any project directory
 
-```sh
-npx nx sync:check
+3. Run `nx show project <your-project>` to see discovered Make targets
+
+For complete documentation, see the [plugin README](packages/nx-make/README.md).
+
+## Repository Structure
+
+```
+nx-make/
+├── packages/
+│   ├── nx-make/           # The nx-make plugin source code
+│   └── example-project/   # Example project demonstrating the plugin
+├── nx.json                # Nx workspace configuration
+└── README.md             # This file
 ```
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
+## Development
 
+### Building the Plugin
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+nx build nx-make
+```
 
-## Install Nx Console
+### Testing the Plugin
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+The `example-project` demonstrates the plugin in action:
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+nx build example-project
+nx test example-project
+```
 
-## Useful links
+### Publishing
 
-Learn more:
+The plugin is configured for publishing to npm:
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/js?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+nx release
+```
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## License
+
+MIT
+
+## Author
+
+Zack DeRose <zack.derose@gmail.com>
+
+## Links
+
+- [GitHub Repository](https://github.com/ZackDeRose/nx-make)
+- [npm Package](https://www.npmjs.com/package/nx-make)
+- [Nx Documentation](https://nx.dev)

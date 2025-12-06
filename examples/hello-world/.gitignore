@@ -1,0 +1,13 @@
+# Build artifacts
+dist/
+build/
+*.o
+*.out
+*.exe
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

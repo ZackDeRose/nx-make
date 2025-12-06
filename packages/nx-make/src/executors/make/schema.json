@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "MakeExecutor",
+  "title": "Make Executor",
+  "description": "Execute a Make target",
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "description": "The Make target to execute"
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Current working directory for the make command (relative to workspace root)"
+    },
+    "args": {
+      "type": "array",
+      "description": "Additional arguments to pass to the make command",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "makeArgs": {
+      "type": "array",
+      "description": "Additional make-specific arguments (e.g., -j4 for parallel builds)",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "required": ["target"]
+}

@@ -20,6 +20,16 @@
           "watchDepsName": "watch-deps"
         }
       }
+    },
+    {
+      "plugin": "nx-make"
     }
-  ]
+  ],
+  "targetDefaults": {
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"]
+    }
+  }
 }
