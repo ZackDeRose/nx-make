@@ -236,6 +236,41 @@ export const createNodesV2: CreateNodesV2<MakePluginOptions> = [
 // Legacy export for backwards compatibility
 export const createNodes = createNodesV2;
 
+/**
+ * Derives a unique project name from the project root path
+ * Uses full path to avoid conflicts between similarly named directories
+ * Examples:
+ *   "examples/hello-world" -> "hello-world"
+ *   "deps/hiredis" -> "deps-hiredis"
+ *   "deps/lua/src" -> "deps-lua-src"
+ *   "src" -> "src"
+ *   "." -> "root"
+ */
+function deriveProjectName(projectRoot: string): string {
+  // If root is ".", use "root"
+  if (projectRoot === '.') {
+    return 'root';
+  }
+
+  // Replace slashes with dashes for unique names
+  // But simplify if it's a top-level directory
+  const parts = projectRoot.split('/').filter(p => p);
+
+  // For single-level paths, just use the name
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  // For nested paths, use the full path with dashes
+  // Skip common prefixes like "examples" for cleaner names
+  if (parts[0] === 'examples' && parts.length === 2) {
+    return parts[1];
+  }
+
+  // Otherwise use the full path
+  return parts.join('-');
+}
+
 function createNodesInternal(
   makefilePath: string,
   options: MakePluginOptions,
@@ -243,6 +278,9 @@ function createNodesInternal(
 ): CreateNodesResult {
   const projectRoot = dirname(makefilePath);
   const absoluteMakefilePath = join(context.workspaceRoot, makefilePath);
+
+  // Derive project name from directory path
+  const projectName = deriveProjectName(projectRoot);
 
   // Create targets for all Make targets in the Makefile
   const targets = createTargetsForMakefile(
@@ -254,6 +292,7 @@ function createNodesInternal(
   return {
     projects: {
       [projectRoot]: {
+        name: projectName,
         targets,
         // Dependencies will be detected via createDependencies API
       },

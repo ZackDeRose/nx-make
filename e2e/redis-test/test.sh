@@ -48,85 +48,9 @@ cat > nx.json << 'NXJSON'
 }
 NXJSON
 
-# Create project.json files for Redis components
-echo "📝 Creating project configurations..."
-
-# Main Redis server/src
-cat > src/project.json << 'PROJSON'
-{
-  "name": "redis-server",
-  "$schema": "../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "src",
-  "projectType": "application"
-}
-PROJSON
-
-# Dependencies directory (has its own Makefile)
-cat > deps/project.json << 'PROJSON'
-{
-  "name": "redis-deps",
-  "$schema": "../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "deps",
-  "projectType": "library"
-}
-PROJSON
-
-# Individual deps with Makefiles
-for dep in hiredis lua jemalloc linenoise hdr_histogram fpconv; do
-  if [ -d "deps/$dep" ] && [ -f "deps/$dep/Makefile" ]; then
-    cat > "deps/$dep/project.json" << PROJSON
-{
-  "name": "$dep",
-  "\$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "deps/$dep",
-  "projectType": "library"
-}
-PROJSON
-    echo "  ✓ Created project.json for $dep"
-  fi
-done
-
-# Handle nested Makefiles that need project configs
-# lua has src and etc subdirectories with Makefiles
-if [ -f "deps/lua/src/Makefile" ]; then
-  cat > "deps/lua/src/project.json" << 'PROJSON'
-{
-  "name": "lua-src",
-  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "deps/lua/src",
-  "projectType": "library"
-}
-PROJSON
-  echo "  ✓ Created project.json for lua-src"
-fi
-
-if [ -f "deps/lua/etc/Makefile" ]; then
-  cat > "deps/lua/etc/project.json" << 'PROJSON'
-{
-  "name": "lua-etc",
-  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "deps/lua/etc",
-  "projectType": "library"
-}
-PROJSON
-  echo "  ✓ Created project.json for lua-etc"
-fi
-
-# Handle modules directories if they exist
-for module_dir in src/modules tests/modules; do
-  if [ -d "$module_dir" ] && [ -f "$module_dir/Makefile" ]; then
-    module_name=$(echo $module_dir | tr '/' '-')
-    cat > "$module_dir/project.json" << PROJSON
-{
-  "name": "$module_name",
-  "\$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "$module_dir",
-  "projectType": "library"
-}
-PROJSON
-    echo "  ✓ Created project.json for $module_name"
-  fi
-done
+# No need for project.json files! The plugin auto-discovers projects from Makefiles
+echo "✨ Plugin will auto-discover all projects from Makefiles..."
+echo "   Expected to find: src/, deps/, and individual dependencies"
 
 # Reset Nx cache
 echo "🔄 Resetting Nx cache..."
@@ -154,20 +78,20 @@ done
 echo ""
 echo "Test 2: Dependency Detection"
 echo "----------------------------"
-echo "Checking if redis-server depends on any deps..."
+echo "Checking if src depends on any deps..."
 
 # Check the project graph for dependencies
 GRAPH_JSON=$(npx nx graph --file=test-graph.json 2>&1)
-if npx nx show project redis-server --json | grep -q "hiredis\|lua\|jemalloc"; then
+if npx nx show project src --json 2>/dev/null | grep -q "hiredis\|lua\|jemalloc"; then
   echo "✅ Dependencies detected in project graph!"
 else
   echo "⚠️  Checking for inferred dependencies from #include statements..."
 fi
 
-# Show what redis-server depends on
+# Show what src depends on
 echo ""
 echo "Dependencies analysis:"
-npx nx show project redis-server --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null | while read dep; do
+npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null | while read dep; do
   echo "  → $dep"
 done || echo "  (Dependencies detected via createDependencies API)"
 
@@ -175,12 +99,12 @@ done || echo "  (Dependencies detected via createDependencies API)"
 echo ""
 echo "Test 3: Build Individual Dependency"
 echo "------------------------------------"
-if npx nx build hiredis 2>&1 | grep -q "Successfully ran target"; then
-  echo "✅ hiredis built successfully"
+if npx nx build deps-hiredis 2>&1 | grep -q "Successfully ran target"; then
+  echo "✅ deps-hiredis built successfully"
 else
-  echo "⚠️  hiredis may not have a 'build' target, trying 'all'"
-  if npx nx all hiredis 2>&1 | grep -q "Successfully ran target\|make"; then
-    echo "✅ hiredis 'all' target executed"
+  echo "⚠️  deps-hiredis may not have a 'build' target, trying 'all'"
+  if npx nx all deps-hiredis 2>&1 | grep -q "Successfully ran target\|make"; then
+    echo "✅ deps-hiredis 'all' target executed"
   fi
 fi
 
@@ -188,7 +112,7 @@ fi
 echo ""
 echo "Test 4: Target Discovery per Project"
 echo "-------------------------------------"
-for proj in redis-server hiredis lua; do
+for proj in src deps-hiredis deps-lua; do
   if npx nx show project $proj > /dev/null 2>&1; then
     TARGET_COUNT=$(npx nx show project $proj --json 2>/dev/null | jq '.targets | length' 2>/dev/null || echo "?")
     echo "  $proj: $TARGET_COUNT targets"

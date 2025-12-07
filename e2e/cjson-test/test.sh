@@ -49,16 +49,8 @@ cat > nx.json << 'NXJSON'
 }
 NXJSON
 
-# Create project.json for cJSON (Nx needs this to recognize it as a project)
-echo "📝 Creating project configuration..."
-cat > project.json << 'PROJSON'
-{
-  "name": "cJSON",
-  "$schema": "./node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": ".",
-  "projectType": "library"
-}
-PROJSON
+# No need for project.json! The plugin auto-detects projects from Makefiles
+echo "✨ Plugin will auto-discover project from Makefile..."
 
 # Reset Nx cache to discover the project
 echo "🔄 Resetting Nx cache..."
@@ -73,13 +65,15 @@ echo "🧪 Running E2E Tests..."
 echo "======================="
 echo ""
 
-# Test 1: Verify project is discovered
+# Test 1: Verify project is discovered (auto-named from directory)
 echo "Test 1: Project Discovery"
 echo "-------------------------"
-if npx nx show project cJSON > /dev/null 2>&1; then
-  echo "✅ cJSON project discovered"
+# The project will be named after the directory (cjson-e2e or root)
+PROJECT_NAME=$(npx nx show projects | grep -v "^$" | head -1)
+if [ -n "$PROJECT_NAME" ]; then
+  echo "✅ Project discovered: $PROJECT_NAME (auto-named from Makefile location)"
 else
-  echo "❌ cJSON project NOT discovered"
+  echo "❌ No project discovered"
   exit 1
 fi
 
@@ -87,10 +81,10 @@ fi
 echo ""
 echo "Test 2: Target Discovery"
 echo "-------------------------"
-TARGETS=$(npx nx show project cJSON --json | grep -o '"[^"]*":{"executor":"nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
+TARGETS=$(npx nx show project $PROJECT_NAME --json | grep -o '"[^"]*":{"executor":"nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
 if [ -n "$TARGETS" ]; then
   echo "✅ Make targets discovered from Makefile"
-  npx nx show project cJSON --json | grep '"executor":"nx-make:make"' | head -5
+  npx nx show project $PROJECT_NAME --json | grep '"executor":"nx-make:make"' | head -5
 else
   echo "❌ No Make targets discovered"
   exit 1
@@ -100,7 +94,7 @@ fi
 echo ""
 echo "Test 3: Available Targets"
 echo "-------------------------"
-npx nx show project cJSON --json | jq -r '.targets | keys[]' | while read target; do
+npx nx show project $PROJECT_NAME --json | jq -r '.targets | keys[]' | while read target; do
   echo "  - $target"
 done
 
@@ -108,7 +102,7 @@ done
 echo ""
 echo "Test 4: Build Execution"
 echo "-------------------------"
-if npx nx all cJSON 2>&1 | grep -q "Successfully ran target"; then
+if npx nx all $PROJECT_NAME 2>&1 | grep -q "Successfully ran target"; then
   echo "✅ Build succeeded (using 'all' target)"
 else
   echo "❌ Build failed"
@@ -132,7 +126,7 @@ fi
 echo ""
 echo "Test 6: Clean Execution"
 echo "-------------------------"
-if npx nx clean cJSON 2>&1 | grep -q "Successfully ran target"; then
+if npx nx clean $PROJECT_NAME 2>&1 | grep -q "Successfully ran target"; then
   echo "✅ Clean succeeded"
 else
   echo "⚠️  Clean target may not exist"

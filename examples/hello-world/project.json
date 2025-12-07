@@ -1,6 +1,0 @@
-{
-  "name": "hello-world",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "examples/hello-world",
-  "projectType": "application"
-}
