@@ -3,16 +3,66 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "e2e/cjson-test",
   "projectType": "application",
+  "implicitDependencies": ["nx-make"],
   "targets": {
     "test": {
+      "executor": "nx:noop",
+      "dependsOn": ["test-gcc", "test-clang", "test-manual"],
+      "metadata": {
+        "description": "Run all cJSON e2e tests (gcc, clang, manual)"
+      }
+    },
+    "test-gcc": {
       "executor": "nx:run-commands",
       "options": {
         "command": "./e2e/cjson-test/test.sh",
         "cwd": "{workspaceRoot}"
       },
-      "cache": false,
+      "dependsOn": ["nx-make:build"],
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "{workspaceRoot}/packages/nx-make/dist/**/*"
+      ],
+      "outputs": [],
       "metadata": {
-        "description": "E2E test using cJSON library",
+        "description": "E2E test using cJSON with gcc compiler",
+        "technologies": ["shell", "make", "gcc"]
+      }
+    },
+    "test-clang": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./e2e/cjson-test/test-clang.sh",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["nx-make:build"],
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "{workspaceRoot}/packages/nx-make/dist/**/*"
+      ],
+      "outputs": [],
+      "metadata": {
+        "description": "E2E test using cJSON with clang compiler",
+        "technologies": ["shell", "make", "clang"]
+      }
+    },
+    "test-manual": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./e2e/cjson-test/test-manual.sh",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["nx-make:build"],
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "{workspaceRoot}/packages/nx-make/dist/**/*"
+      ],
+      "outputs": [],
+      "metadata": {
+        "description": "E2E test using cJSON with manual regex parsing",
         "technologies": ["shell", "make"]
       }
     }
