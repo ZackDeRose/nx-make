@@ -47,3 +47,4 @@ Thumbs.db
 graph.html
 *-graph.html
 static/
+e2e/**/workspace/
