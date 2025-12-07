@@ -2608,6 +2608,9 @@ packages:
 
   nx-make@file:packages/nx-make:
     resolution: {directory: packages/nx-make, type: directory}
+    engines: {node: '>=18.0.0'}
+    cpu: [x64, arm64]
+    os: [darwin, linux, win32]
     peerDependencies:
       nx: '>= 22.0.0'
 

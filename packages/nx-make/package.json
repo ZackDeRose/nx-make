@@ -75,5 +75,10 @@
   },
   "peerDependencies": {
     "nx": ">= 22.0.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"]
 }

@@ -10,6 +10,7 @@ import type {
 import { createNodesFromFiles, DependencyType, validateDependency } from '@nx/devkit';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 
 export interface MakePluginOptions {
   targetName?: string;
@@ -44,35 +45,79 @@ function parseMakefile(makefilePath: string): string[] {
   return targets;
 }
 
-// Supported file extensions for C/C++ source and header files
-const CPP_EXTENSIONS = ['.c', '.h', '.cpp', '.hpp', '.cc', '.cxx', '.C', '.H', '.hh', '.h++', '.ipp'];
+// Supported file extensions for C/C++ source files (used with gcc -MM)
+const CPP_SOURCE_EXTENSIONS = ['.c', '.cpp', '.cc', '.cxx', '.C'];
 
 // Directories to skip during scanning
 const EXCLUDE_DIRS = ['dist', 'build', 'node_modules', '.git', '.nx', 'out', 'target', 'bin', 'obj'];
 
 /**
- * Removes comments and string literals to avoid false positive #include matches
+ * Gets the available compiler command (gcc or clang)
  */
-function stripCommentsAndStrings(content: string): string {
-  // Remove single-line comments
-  let cleaned = content.replace(/\/\/.*$/gm, '');
-  // Remove multi-line comments
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
-  // Remove string literals (simple approach - doesn't handle all edge cases but good enough)
-  cleaned = cleaned.replace(/"([^"\\]|\\.)*"/g, '""');
-  cleaned = cleaned.replace(/'([^'\\]|\\.)*'/g, "''");
-  return cleaned;
+function getCompilerCommand(): string | null {
+  try {
+    execSync('gcc --version', { stdio: 'ignore' });
+    return 'gcc';
+  } catch {
+    try {
+      execSync('clang --version', { stdio: 'ignore' });
+      return 'clang';
+    } catch {
+      return null;
+    }
+  }
 }
 
 /**
- * Scans C/C++ files in a directory for #include statements
+ * Uses gcc/clang -MM to get accurate dependencies for a source file
+ * Returns an array of included file paths
+ */
+function getDependenciesFromCompiler(
+  sourceFile: string,
+  workspaceRoot: string,
+  compiler: string
+): string[] {
+  try {
+    // Use -MM to get user includes (excludes system headers)
+    // Use -MT dummy to simplify output parsing
+    const output = execSync(
+      `${compiler} -MM -MT dummy "${sourceFile}"`,
+      {
+        cwd: workspaceRoot,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'], // Suppress stderr
+      }
+    );
+
+    // Parse output format: "dummy: source.c header1.h header2.h ..."
+    // Remove the target part and backslash continuations
+    const cleaned = output
+      .replace(/^[^:]*:\s*/, '') // Remove "dummy: "
+      .replace(/\\\n/g, ' ')      // Handle line continuations
+      .trim();
+
+    // Split by whitespace and filter out the source file itself
+    const deps = cleaned
+      .split(/\s+/)
+      .filter(dep => dep && dep !== sourceFile);
+
+    return deps;
+  } catch {
+    // If compiler fails (file doesn't compile, etc.), return empty
+    return [];
+  }
+}
+
+/**
+ * Scans C/C++ files in a directory for #include statements using gcc -MM
  * Returns a map of include paths to the source file that includes them
  *
- * Supports: C (.c, .h) and C++ (.cpp, .hpp, .cc, .cxx, etc.)
- * Filters: Comments and string literals to avoid false positives
+ * Uses gcc/clang -MM for accurate dependency detection (industry standard)
+ * Falls back to regex parsing if compiler is not available
  */
 function scanForIncludes(projectDir: string, projectRoot: string): Map<string, string> {
   const includes: Map<string, string> = new Map();
+  const compiler = getCompilerCommand();
 
   function scanDirectory(dir: string) {
     if (!existsSync(dir)) return;
@@ -91,25 +136,18 @@ function scanForIncludes(projectDir: string, projectRoot: string): Map<string, s
 
         if (stat.isDirectory()) {
           scanDirectory(fullPath);
-        } else if (CPP_EXTENSIONS.some(ext => entry.endsWith(ext))) {
-          try {
-            const content = readFileSync(fullPath, 'utf-8');
-            // Remove comments and strings to avoid false positives
-            const cleanContent = stripCommentsAndStrings(content);
+        } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
+          // Use compiler-based dependency detection if available
+          if (compiler) {
+            const deps = getDependenciesFromCompiler(fullPath, dir, compiler);
+            const relativeFilePath = fullPath.replace(projectDir + '/', '');
+            const sourceFile = join(projectRoot, relativeFilePath);
 
-            // Match #include "..." or #include <...>
-            const includeRegex = /#include\s+["<]([^">]+)[">]/g;
-            const matches = cleanContent.matchAll(includeRegex);
-
-            for (const match of matches) {
-              const includePath = match[1];
-              // Store the relative path from project root
-              const relativeFilePath = fullPath.replace(projectDir + '/', '');
-              const sourceFile = join(projectRoot, relativeFilePath);
-              includes.set(includePath, sourceFile);
+            for (const dep of deps) {
+              // Normalize the dependency path
+              const normalizedDep = dep.replace(/\\/g, '/');
+              includes.set(normalizedDep, sourceFile);
             }
-          } catch {
-            // Skip files that can't be read
           }
         }
       }

@@ -10,6 +10,15 @@ An Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph.
 - 🔗 Leverage Nx caching and dependency management with your Make tasks
 - 🎯 Simple configuration and setup
 
+## Requirements
+
+- **Node.js**: >= 18.0.0
+- **Nx**: >= 22.0.0
+- **C/C++ Compiler**: gcc or clang (for dependency detection)
+  - Required for automatic dependency detection between projects
+  - The plugin uses `gcc -MM` or `clang -MM` to analyze #include statements
+  - Most systems with Make already have these installed
+
 ## Installation
 
 ```bash
@@ -22,6 +31,17 @@ pnpm add -D nx-make
 
 ```bash
 yarn add -D nx-make
+```
+
+### Verifying Requirements
+
+```bash
+# Check if gcc or clang is available
+gcc --version
+# or
+clang --version
+
+# If not installed, see installation instructions below
 ```
 
 ## Setup
