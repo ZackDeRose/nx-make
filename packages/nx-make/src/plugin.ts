@@ -15,11 +15,14 @@ import { execSync } from 'node:child_process';
 export interface MakePluginOptions {
   targetName?: string;
   /**
-   * Compiler to use for dependency detection (gcc or clang)
-   * Defaults to 'gcc', falls back to 'clang' if gcc is not available
-   * Set to 'clang' to prefer clang, or 'none' to disable compiler-based detection
+   * Compiler to use for dependency detection
+   * - 'gcc' (default): Use gcc -MM for dependency detection
+   * - 'clang': Use clang -MM for dependency detection
+   * - 'manual': Use regex-based parsing (fallback for environments without compilers)
+   *
+   * Throws an error if the specified compiler is not available.
    */
-  dependencyCompiler?: 'gcc' | 'clang' | 'auto' | 'none';
+  dependencyCompiler?: 'gcc' | 'clang' | 'manual';
 }
 
 const MAKEFILE_GLOB = '**/Makefile';
@@ -58,36 +61,27 @@ const CPP_SOURCE_EXTENSIONS = ['.c', '.cpp', '.cc', '.cxx', '.C'];
 const EXCLUDE_DIRS = ['dist', 'build', 'node_modules', '.git', '.nx', 'out', 'target', 'bin', 'obj'];
 
 /**
- * Gets the compiler command based on options and availability
- * Priority: option preference > gcc > clang > null
+ * Gets the compiler command, throwing an error if not available
+ * Defaults to 'gcc' if no preference specified
  */
-function getCompilerCommand(preferredCompiler?: 'gcc' | 'clang' | 'auto' | 'none'): string | null {
-  // If explicitly set to 'none', don't use compiler
-  if (preferredCompiler === 'none') {
+function getCompilerCommand(preferredCompiler?: 'gcc' | 'clang' | 'manual'): string | null {
+  const compiler = preferredCompiler || 'gcc';
+
+  // Manual mode - use regex parsing instead of compiler
+  if (compiler === 'manual') {
     return null;
   }
 
-  // If a specific compiler is preferred, try it first
-  if (preferredCompiler === 'gcc' || preferredCompiler === 'clang') {
-    try {
-      execSync(`${preferredCompiler} --version`, { stdio: 'ignore' });
-      return preferredCompiler;
-    } catch {
-      // Preferred compiler not available, fall through to auto detection
-    }
-  }
-
-  // Auto-detect: try gcc first (more common), then clang
+  // Check if the specified compiler is available
   try {
-    execSync('gcc --version', { stdio: 'ignore' });
-    return 'gcc';
+    execSync(`${compiler} --version`, { stdio: 'ignore' });
+    return compiler;
   } catch {
-    try {
-      execSync('clang --version', { stdio: 'ignore' });
-      return 'clang';
-    } catch {
-      return null;
-    }
+    throw new Error(
+      `[nx-make] Compiler '${compiler}' is not available. ` +
+      `Please install ${compiler} or set dependencyCompiler to 'manual' in nx.json. ` +
+      `See: https://github.com/ZackDeRose/nx-make#requirements`
+    );
   }
 }
 
@@ -132,19 +126,10 @@ function getDependenciesFromCompiler(
 }
 
 /**
- * Scans C/C++ files in a directory for #include statements using gcc -MM
- * Returns a map of include paths to the source file that includes them
- *
- * Uses gcc/clang -MM for accurate dependency detection (industry standard)
- * Compiler preference can be configured via plugin options
+ * Manual (regex-based) include scanning - fallback when compiler is not used
  */
-function scanForIncludes(
-  projectDir: string,
-  projectRoot: string,
-  options?: MakePluginOptions
-): Map<string, string> {
+function scanForIncludesManual(projectDir: string, projectRoot: string): Map<string, string> {
   const includes: Map<string, string> = new Map();
-  const compiler = getCompilerCommand(options?.dependencyCompiler);
 
   function scanDirectory(dir: string) {
     if (!existsSync(dir)) return;
@@ -156,25 +141,27 @@ function scanForIncludes(
         const fullPath = join(dir, entry);
         const stat = statSync(fullPath);
 
-        // Skip excluded directories
         if (EXCLUDE_DIRS.includes(entry)) {
           continue;
         }
 
         if (stat.isDirectory()) {
           scanDirectory(fullPath);
-        } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
-          // Use compiler-based dependency detection if available
-          if (compiler) {
-            const deps = getDependenciesFromCompiler(fullPath, dir, compiler);
-            const relativeFilePath = fullPath.replace(projectDir + '/', '');
-            const sourceFile = join(projectRoot, relativeFilePath);
+        } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext)) || entry.endsWith('.h') || entry.endsWith('.hpp')) {
+          try {
+            const content = readFileSync(fullPath, 'utf-8');
+            // Simple regex - less accurate than compiler but works without dependencies
+            const includeRegex = /#include\s+["<]([^">]+)[">]/g;
+            const matches = content.matchAll(includeRegex);
 
-            for (const dep of deps) {
-              // Normalize the dependency path
-              const normalizedDep = dep.replace(/\\/g, '/');
-              includes.set(normalizedDep, sourceFile);
+            for (const match of matches) {
+              const includePath = match[1];
+              const relativeFilePath = fullPath.replace(projectDir + '/', '');
+              const sourceFile = join(projectRoot, relativeFilePath);
+              includes.set(includePath, sourceFile);
             }
+          } catch {
+            // Skip files that can't be read
           }
         }
       }
@@ -185,6 +172,72 @@ function scanForIncludes(
 
   scanDirectory(projectDir);
   return includes;
+}
+
+/**
+ * Scans C/C++ files for #include statements using compiler-based detection
+ */
+function scanForIncludesWithCompiler(
+  projectDir: string,
+  projectRoot: string,
+  compiler: string
+): Map<string, string> {
+  const includes: Map<string, string> = new Map();
+
+  function scanDirectory(dir: string) {
+    if (!existsSync(dir)) return;
+
+    try {
+      const entries = readdirSync(dir);
+
+      for (const entry of entries) {
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
+
+        if (EXCLUDE_DIRS.includes(entry)) {
+          continue;
+        }
+
+        if (stat.isDirectory()) {
+          scanDirectory(fullPath);
+        } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
+          const deps = getDependenciesFromCompiler(fullPath, dir, compiler);
+          const relativeFilePath = fullPath.replace(projectDir + '/', '');
+          const sourceFile = join(projectRoot, relativeFilePath);
+
+          for (const dep of deps) {
+            const normalizedDep = dep.replace(/\\/g, '/');
+            includes.set(normalizedDep, sourceFile);
+          }
+        }
+      }
+    } catch {
+      // Skip directories that can't be read
+    }
+  }
+
+  scanDirectory(projectDir);
+  return includes;
+}
+
+/**
+ * Scans C/C++ files for #include statements
+ * Uses gcc/clang -MM by default (industry standard) or manual regex parsing
+ */
+function scanForIncludes(
+  projectDir: string,
+  projectRoot: string,
+  options?: MakePluginOptions
+): Map<string, string> {
+  const compiler = getCompilerCommand(options?.dependencyCompiler);
+
+  // Use manual regex parsing if compiler is null (manual mode)
+  if (!compiler) {
+    return scanForIncludesManual(projectDir, projectRoot);
+  }
+
+  // Use compiler-based detection
+  return scanForIncludesWithCompiler(projectDir, projectRoot, compiler);
 }
 
 /**

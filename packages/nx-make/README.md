@@ -130,17 +130,18 @@ You can configure the plugin in `nx.json`:
 - `targetName` (optional): Prefix for all Make targets. If set to `"make"`, targets will be named `make:build`, `make:test`, etc.
 
 - `dependencyCompiler` (optional): Compiler to use for dependency detection. Options:
-  - `"auto"` (default): Try gcc first, then clang
-  - `"gcc"`: Use gcc exclusively
-  - `"clang"`: Use clang exclusively
-  - `"none"`: Disable compiler-based dependency detection
+  - `"gcc"` (default): Use gcc -MM for dependency detection
+  - `"clang"`: Use clang -MM for dependency detection
+  - `"manual"`: Use regex-based parsing (fallback for environments without compilers)
 
-  **Why this matters**: gcc and clang may produce different dependency graphs due to:
-  - Different default include paths
-  - Compiler-specific extensions
-  - Platform-specific headers
+  **Important**: The plugin will throw an error if the specified compiler is not installed.
 
-  **Recommendation**: Use the same compiler that your project builds with for consistency.
+  **Why this matters**:
+  - gcc and clang may produce different dependency graphs due to different include paths
+  - You should use the same compiler your project actually builds with
+  - Manual mode is less accurate but works without a compiler
+
+  **Default behavior**: Uses gcc. If your project uses clang, explicitly configure it.
 
 ### Executor Configuration
 
