@@ -44,9 +44,32 @@ function parseMakefile(makefilePath: string): string[] {
   return targets;
 }
 
+// Supported file extensions for C/C++ source and header files
+const CPP_EXTENSIONS = ['.c', '.h', '.cpp', '.hpp', '.cc', '.cxx', '.C', '.H', '.hh', '.h++', '.ipp'];
+
+// Directories to skip during scanning
+const EXCLUDE_DIRS = ['dist', 'build', 'node_modules', '.git', '.nx', 'out', 'target', 'bin', 'obj'];
+
 /**
- * Scans C/H files in a directory for #include statements
+ * Removes comments and string literals to avoid false positive #include matches
+ */
+function stripCommentsAndStrings(content: string): string {
+  // Remove single-line comments
+  let cleaned = content.replace(/\/\/.*$/gm, '');
+  // Remove multi-line comments
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove string literals (simple approach - doesn't handle all edge cases but good enough)
+  cleaned = cleaned.replace(/"([^"\\]|\\.)*"/g, '""');
+  cleaned = cleaned.replace(/'([^'\\]|\\.)*'/g, "''");
+  return cleaned;
+}
+
+/**
+ * Scans C/C++ files in a directory for #include statements
  * Returns a map of include paths to the source file that includes them
+ *
+ * Supports: C (.c, .h) and C++ (.cpp, .hpp, .cc, .cxx, etc.)
+ * Filters: Comments and string literals to avoid false positives
  */
 function scanForIncludes(projectDir: string, projectRoot: string): Map<string, string> {
   const includes: Map<string, string> = new Map();
@@ -61,19 +84,22 @@ function scanForIncludes(projectDir: string, projectRoot: string): Map<string, s
         const fullPath = join(dir, entry);
         const stat = statSync(fullPath);
 
-        // Skip dist/build directories
-        if (entry === 'dist' || entry === 'build' || entry === 'node_modules') {
+        // Skip excluded directories
+        if (EXCLUDE_DIRS.includes(entry)) {
           continue;
         }
 
         if (stat.isDirectory()) {
           scanDirectory(fullPath);
-        } else if (entry.endsWith('.c') || entry.endsWith('.h')) {
+        } else if (CPP_EXTENSIONS.some(ext => entry.endsWith(ext))) {
           try {
             const content = readFileSync(fullPath, 'utf-8');
+            // Remove comments and strings to avoid false positives
+            const cleanContent = stripCommentsAndStrings(content);
+
             // Match #include "..." or #include <...>
             const includeRegex = /#include\s+["<]([^">]+)[">]/g;
-            const matches = content.matchAll(includeRegex);
+            const matches = cleanContent.matchAll(includeRegex);
 
             for (const match of matches) {
               const includePath = match[1];
@@ -82,12 +108,12 @@ function scanForIncludes(projectDir: string, projectRoot: string): Map<string, s
               const sourceFile = join(projectRoot, relativeFilePath);
               includes.set(includePath, sourceFile);
             }
-          } catch (e) {
+          } catch {
             // Skip files that can't be read
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Skip directories that can't be read
     }
   }
