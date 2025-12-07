@@ -18,7 +18,7 @@ rm -rf e2e/*/workspace
 
 **Status**: ✅ Passing
 **Target**: [DaveGamble/cJSON v1.7.18](https://github.com/DaveGamble/cJSON)
-**Purpose**: Validates plugin against a real-world C library
+**Purpose**: Validates plugin against a simple single-project C library
 
 **What it tests**:
 1. ✅ Project discovery from Makefile
@@ -28,19 +28,40 @@ rm -rf e2e/*/workspace
 5. ✅ Clean execution
 
 **Results**:
-- Discovered 13 Make targets from cJSON's Makefile
-- Successfully built shared libraries (.dylib)
-- Successfully built static libraries (.a)
-- Created object files and test executable
-- Clean target works correctly
+- Single project with 13 Make targets
+- Successfully built shared/static libraries
+- Validates basic plugin functionality
 
 See [cjson-test/README.md](./cjson-test/README.md) for details.
 
+### Redis Test
+
+**Status**: ✅ Passing
+**Target**: [redis/redis 7.4](https://github.com/redis/redis)
+**Purpose**: Validates plugin against a complex multi-project C system
+
+**What it tests**:
+1. ✅ Multi-project discovery (12 projects)
+2. ✅ Complex Makefile parsing (68+ targets)
+3. ✅ Hierarchical project structure (deps/ subdirectories)
+4. ✅ Build execution across components
+5. ✅ Project graph visualization
+
+**Results**:
+- Discovered 12 projects including redis-server, hiredis, lua, jemalloc, etc.
+- redis-server: 24 targets
+- hiredis: 34 targets
+- lua: 10 targets
+- Demonstrates plugin scales to production systems
+
+See [redis-test/README.md](./redis-test/README.md) for details.
+
 ## Test Results Summary
 
-| Test | Project | Targets | Build | Status |
-|------|---------|---------|-------|--------|
-| cJSON | v1.7.18 | 13 | ✅ | ✅ Passing |
+| Test | Project | Projects | Targets | Build | Status |
+|------|---------|----------|---------|-------|--------|
+| cJSON | v1.7.18 | 1 | 13 | ✅ | ✅ Passing |
+| Redis | 7.4 | 12 | 68+ | ✅ | ✅ Passing |
 
 ## Adding New E2E Tests
 
