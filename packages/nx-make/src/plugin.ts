@@ -14,6 +14,12 @@ import { execSync } from 'node:child_process';
 
 export interface MakePluginOptions {
   targetName?: string;
+  /**
+   * Compiler to use for dependency detection (gcc or clang)
+   * Defaults to 'gcc', falls back to 'clang' if gcc is not available
+   * Set to 'clang' to prefer clang, or 'none' to disable compiler-based detection
+   */
+  dependencyCompiler?: 'gcc' | 'clang' | 'auto' | 'none';
 }
 
 const MAKEFILE_GLOB = '**/Makefile';
@@ -52,9 +58,26 @@ const CPP_SOURCE_EXTENSIONS = ['.c', '.cpp', '.cc', '.cxx', '.C'];
 const EXCLUDE_DIRS = ['dist', 'build', 'node_modules', '.git', '.nx', 'out', 'target', 'bin', 'obj'];
 
 /**
- * Gets the available compiler command (gcc or clang)
+ * Gets the compiler command based on options and availability
+ * Priority: option preference > gcc > clang > null
  */
-function getCompilerCommand(): string | null {
+function getCompilerCommand(preferredCompiler?: 'gcc' | 'clang' | 'auto' | 'none'): string | null {
+  // If explicitly set to 'none', don't use compiler
+  if (preferredCompiler === 'none') {
+    return null;
+  }
+
+  // If a specific compiler is preferred, try it first
+  if (preferredCompiler === 'gcc' || preferredCompiler === 'clang') {
+    try {
+      execSync(`${preferredCompiler} --version`, { stdio: 'ignore' });
+      return preferredCompiler;
+    } catch {
+      // Preferred compiler not available, fall through to auto detection
+    }
+  }
+
+  // Auto-detect: try gcc first (more common), then clang
   try {
     execSync('gcc --version', { stdio: 'ignore' });
     return 'gcc';
@@ -113,11 +136,15 @@ function getDependenciesFromCompiler(
  * Returns a map of include paths to the source file that includes them
  *
  * Uses gcc/clang -MM for accurate dependency detection (industry standard)
- * Falls back to regex parsing if compiler is not available
+ * Compiler preference can be configured via plugin options
  */
-function scanForIncludes(projectDir: string, projectRoot: string): Map<string, string> {
+function scanForIncludes(
+  projectDir: string,
+  projectRoot: string,
+  options?: MakePluginOptions
+): Map<string, string> {
   const includes: Map<string, string> = new Map();
-  const compiler = getCompilerCommand();
+  const compiler = getCompilerCommand(options?.dependencyCompiler);
 
   function scanDirectory(dir: string) {
     if (!existsSync(dir)) return;
@@ -369,7 +396,7 @@ function createNodesInternal(
  * This analyzes C #include statements and creates native project graph dependencies
  */
 export const createDependencies: CreateDependencies<MakePluginOptions> = (
-  _options: MakePluginOptions | undefined,
+  options: MakePluginOptions | undefined,
   context: CreateDependenciesContext
 ) => {
   const dependencies: RawProjectGraphDependency[] = [];
@@ -380,7 +407,7 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
     const projectAbsPath = join(context.workspaceRoot, projectRoot);
 
     // Scan for #include statements in this project (returns Map<includePath, sourceFile>)
-    const includes = scanForIncludes(projectAbsPath, projectRoot);
+    const includes = scanForIncludes(projectAbsPath, projectRoot, options);
 
     // Map include paths to actual project dependencies
     const projectDependencies = mapIncludesToProjectNames(

@@ -117,7 +117,8 @@ You can configure the plugin in `nx.json`:
     {
       "plugin": "nx-make",
       "options": {
-        "targetName": "make"
+        "targetName": "make",
+        "dependencyCompiler": "gcc"
       }
     }
   ]
@@ -127,6 +128,19 @@ You can configure the plugin in `nx.json`:
 #### Options
 
 - `targetName` (optional): Prefix for all Make targets. If set to `"make"`, targets will be named `make:build`, `make:test`, etc.
+
+- `dependencyCompiler` (optional): Compiler to use for dependency detection. Options:
+  - `"auto"` (default): Try gcc first, then clang
+  - `"gcc"`: Use gcc exclusively
+  - `"clang"`: Use clang exclusively
+  - `"none"`: Disable compiler-based dependency detection
+
+  **Why this matters**: gcc and clang may produce different dependency graphs due to:
+  - Different default include paths
+  - Compiler-specific extensions
+  - Platform-specific headers
+
+  **Recommendation**: Use the same compiler that your project builds with for consistency.
 
 ### Executor Configuration
 
