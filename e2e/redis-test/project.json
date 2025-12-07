@@ -1,0 +1,20 @@
+{
+  "name": "e2e-redis",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "e2e/redis-test",
+  "projectType": "application",
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./e2e/redis-test/test.sh",
+        "cwd": "{workspaceRoot}"
+      },
+      "cache": false,
+      "metadata": {
+        "description": "E2E test using Redis multi-project structure",
+        "technologies": ["shell", "make"]
+      }
+    }
+  }
+}

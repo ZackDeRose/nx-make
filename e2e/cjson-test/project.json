@@ -1,0 +1,20 @@
+{
+  "name": "e2e-cjson",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "e2e/cjson-test",
+  "projectType": "application",
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./e2e/cjson-test/test.sh",
+        "cwd": "{workspaceRoot}"
+      },
+      "cache": false,
+      "metadata": {
+        "description": "E2E test using cJSON library",
+        "technologies": ["shell", "make"]
+      }
+    }
+  }
+}

@@ -4,9 +4,26 @@ End-to-end tests that validate the nx-make plugin against real-world open-source
 
 ## Running Tests
 
+### Via Nx (Recommended)
+
 ```bash
 # Run all e2e tests
+nx run-many --target=test --projects=e2e-cjson,e2e-redis
+
+# Run individual test
+nx test e2e-cjson
+nx test e2e-redis
+
+# Run with Nx affected
+nx affected --target=test
+```
+
+### Direct Execution
+
+```bash
+# Run test scripts directly
 ./e2e/cjson-test/test.sh
+./e2e/redis-test/test.sh
 
 # Clean up test workspaces
 rm -rf e2e/*/workspace
