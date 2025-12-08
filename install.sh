@@ -181,6 +181,39 @@ else
   echo "  - Linux: sudo apt-get install build-essential"
 fi
 
+# Update .gitignore
+echo ""
+echo "📝 Updating .gitignore..."
+
+GITIGNORE_ENTRIES=(
+  ""
+  "# Nx"
+  ".nx/cache"
+  ".nx/workspace-data"
+  ""
+  "# Node.js"
+  "node_modules/"
+  ""
+  "# Nx graph output"
+  "graph.html"
+  "*-graph.html"
+  "static/"
+)
+
+# Create .gitignore if it doesn't exist
+if [ ! -f ".gitignore" ]; then
+  touch .gitignore
+fi
+
+# Check and add missing entries
+for entry in "${GITIGNORE_ENTRIES[@]}"; do
+  if [ -n "$entry" ] && ! grep -qF "$entry" .gitignore 2>/dev/null; then
+    echo "$entry" >> .gitignore
+  fi
+done
+
+echo -e "${GREEN}✅ Updated .gitignore with Nx patterns${NC}"
+
 # Success!
 echo ""
 echo -e "${BOLD}${GREEN}✅ Installation Complete!${NC}"
