@@ -28,27 +28,42 @@ export interface MakePluginOptions {
 const MAKEFILE_GLOB = '**/Makefile';
 
 /**
- * Parses a Makefile to extract target names
+ * Parses a Makefile to extract target names and their prerequisites
+ * Returns a map of target names to their prerequisites
  */
-function parseMakefile(makefilePath: string): string[] {
+function parseMakefile(makefilePath: string): Map<string, string[]> {
+  const targets = new Map<string, string[]>();
+
   if (!existsSync(makefilePath)) {
-    return [];
+    return targets;
   }
 
   const content = readFileSync(makefilePath, 'utf-8');
-  const targets: string[] = [];
 
-  // Match target definitions (lines that start with a word followed by a colon)
-  // This is a simplified parser - real Makefiles can be more complex
-  const targetRegex = /^([a-zA-Z0-9_-]+):/gm;
+  // Match target definitions with prerequisites
+  // Format: target: prerequisite1 prerequisite2
+  // Also handles targets without prerequisites: target:
+  const targetRegex = /^([a-zA-Z0-9_-]+):\s*([^\n]*)/gm;
   const matches = content.matchAll(targetRegex);
 
   for (const match of matches) {
     const targetName = match[1];
+    const prerequisitesStr = match[2];
+
     // Skip special targets and internal targets (starting with .)
-    if (!targetName.startsWith('.') && !targetName.startsWith('_')) {
-      targets.push(targetName);
+    if (targetName.startsWith('.') || targetName.startsWith('_')) {
+      continue;
     }
+
+    // Parse prerequisites (space-separated, may include variables)
+    const prerequisites = prerequisitesStr
+      .split(/\s+/)
+      .filter(p => p && !p.includes('$')) // Skip empty and variable refs
+      .filter(p => !p.startsWith('/'))    // Skip absolute paths (files, not targets)
+      .filter(p => !p.startsWith('@'))    // Skip commands like @echo
+      .filter(p => !p.startsWith('"'));   // Skip string literals
+
+    targets.set(targetName, prerequisites);
   }
 
   return targets;
@@ -86,25 +101,75 @@ function getCompilerCommand(preferredCompiler?: 'gcc' | 'clang' | 'manual'): str
 }
 
 /**
+ * Extracts -I include paths from a Makefile
+ * Returns an array of include path flags like ['-I../deps/hiredis', '-I../deps/lua/src']
+ */
+function extractIncludePathsFromMakefile(makefilePath: string): string[] {
+  if (!existsSync(makefilePath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(makefilePath, 'utf-8');
+    const includePaths: Set<string> = new Set();
+
+    // Look for -I flags in the Makefile
+    // Match: -I../path, -I$(VAR), -I/path, -I ./path, etc.
+    // Stop at whitespace, quotes, or backslashes
+    const includeRegex = /-I\s*([^\s"'\\]+)/g;
+    const matches = content.matchAll(includeRegex);
+
+    for (const match of matches) {
+      let includePath = match[1];
+
+      // Skip variable references for now (too complex to resolve)
+      if (includePath.includes('$')) {
+        continue;
+      }
+
+      // Clean up the path - remove any trailing quotes or special chars
+      includePath = includePath.replace(/["']+$/, '').trim();
+
+      if (includePath) {
+        // Store with -I prefix intact
+        includePaths.add(`-I${includePath}`);
+      }
+    }
+
+    const paths = Array.from(includePaths);
+
+    // Debug logging - remove after testing
+    if (paths.length > 0 && makefilePath.includes('src/Makefile')) {
+      console.log(`[nx-make] Extracted ${paths.length} include paths from ${makefilePath}:`, paths);
+    }
+
+    return paths;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Uses gcc/clang -MM to get accurate dependencies for a source file
  * Returns an array of included file paths
+ * Optionally accepts include paths from the Makefile
  */
 function getDependenciesFromCompiler(
   sourceFile: string,
   workspaceRoot: string,
-  compiler: string
+  compiler: string,
+  includePaths: string[] = []
 ): string[] {
   try {
-    // Use -MM to get user includes (excludes system headers)
-    // Use -MT dummy to simplify output parsing
-    const output = execSync(
-      `${compiler} -MM -MT dummy "${sourceFile}"`,
-      {
-        cwd: workspaceRoot,
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'ignore'], // Suppress stderr
-      }
-    );
+    // Build the compiler command with include paths
+    const includeFlags = includePaths.join(' ');
+    const command = `${compiler} -MM -MT dummy ${includeFlags} "${sourceFile}"`;
+
+    const output = execSync(command, {
+      cwd: workspaceRoot,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'], // Suppress stderr
+    });
 
     // Parse output format: "dummy: source.c header1.h header2.h ..."
     // Remove the target part and backslash continuations
@@ -180,9 +245,14 @@ function scanForIncludesManual(projectDir: string, projectRoot: string): Map<str
 function scanForIncludesWithCompiler(
   projectDir: string,
   projectRoot: string,
-  compiler: string
+  compiler: string,
+  workspaceRoot: string
 ): Map<string, string> {
   const includes: Map<string, string> = new Map();
+
+  // Try to extract include paths from the project's Makefile
+  const makefilePath = join(projectDir, 'Makefile');
+  const includePaths = extractIncludePathsFromMakefile(makefilePath);
 
   function scanDirectory(dir: string) {
     if (!existsSync(dir)) return;
@@ -201,7 +271,7 @@ function scanForIncludesWithCompiler(
         if (stat.isDirectory()) {
           scanDirectory(fullPath);
         } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
-          const deps = getDependenciesFromCompiler(fullPath, dir, compiler);
+          const deps = getDependenciesFromCompiler(fullPath, projectDir, compiler, includePaths);
           const relativeFilePath = fullPath.replace(projectDir + '/', '');
           const sourceFile = join(projectRoot, relativeFilePath);
 
@@ -227,6 +297,7 @@ function scanForIncludesWithCompiler(
 function scanForIncludes(
   projectDir: string,
   projectRoot: string,
+  workspaceRoot: string,
   options?: MakePluginOptions
 ): Map<string, string> {
   const compiler = getCompilerCommand(options?.dependencyCompiler);
@@ -236,8 +307,8 @@ function scanForIncludes(
     return scanForIncludesManual(projectDir, projectRoot);
   }
 
-  // Use compiler-based detection
-  return scanForIncludesWithCompiler(projectDir, projectRoot, compiler);
+  // Use compiler-based detection with Makefile include paths
+  return scanForIncludesWithCompiler(projectDir, projectRoot, compiler, workspaceRoot);
 }
 
 /**
@@ -299,7 +370,7 @@ function createTargetsForMakefile(
   const targets: Record<string, TargetConfiguration> = {};
   const makeTargets = parseMakefile(makefilePath);
 
-  for (const makeTarget of makeTargets) {
+  for (const [makeTarget, prerequisites] of makeTargets) {
     const targetName = options.targetName
       ? `${options.targetName}:${makeTarget}`
       : makeTarget;
@@ -316,20 +387,37 @@ function createTargetsForMakefile(
       },
     };
 
-    // Add target-level dependencies for build-like targets
-    // Use ^build pattern which means "build target of dependencies"
+    // Build dependsOn from Makefile prerequisites
+    const dependsOn: string[] = [];
+
+    // Add cross-project dependencies for build-like targets
     if (makeTarget === 'build' || makeTarget === 'compile' || makeTarget === 'all') {
-      targetConfig.dependsOn = ['^build'];
+      dependsOn.push('^build');
+    }
+
+    // Add intra-project dependencies from Make prerequisites
+    for (const prereq of prerequisites) {
+      // Check if this prerequisite is also a Make target (not a file)
+      if (makeTargets.has(prereq)) {
+        const prereqTargetName = options.targetName
+          ? `${options.targetName}:${prereq}`
+          : prereq;
+        dependsOn.push(prereqTargetName);
+      }
+    }
+
+    if (dependsOn.length > 0) {
+      targetConfig.dependsOn = dependsOn;
     }
 
     targets[targetName] = targetConfig;
   }
 
   // Auto-generate serve target if both build/compile and run targets exist
-  const hasBuildTarget = makeTargets.some(t =>
+  const hasBuildTarget = Array.from(makeTargets.keys()).some(t =>
     t === 'build' || t === 'compile' || t === 'all'
   );
-  const hasRunTarget = makeTargets.includes('run');
+  const hasRunTarget = makeTargets.has('run');
 
   if (hasBuildTarget && hasRunTarget) {
     const serveTargetName = options.targetName
@@ -460,7 +548,7 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
     const projectAbsPath = join(context.workspaceRoot, projectRoot);
 
     // Scan for #include statements in this project (returns Map<includePath, sourceFile>)
-    const includes = scanForIncludes(projectAbsPath, projectRoot, options);
+    const includes = scanForIncludes(projectAbsPath, projectRoot, context.workspaceRoot, options);
 
     // Map include paths to actual project dependencies
     const projectDependencies = mapIncludesToProjectNames(
