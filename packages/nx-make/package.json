@@ -1,6 +1,6 @@
 {
   "name": "nx-make",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": false,
   "description": "Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph",
   "author": "Zack DeRose <zack.derose@gmail.com>",
