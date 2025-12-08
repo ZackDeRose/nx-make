@@ -35,16 +35,26 @@ git checkout "$CJSON_COMMIT"
 echo "📦 Running nx-make installation script..."
 echo "   (Using local version for testing)"
 
-# Use the local install script
-# Point to local package for testing instead of published npm package
-cat "$WORKSPACE_ROOT/install.sh" | \
-  sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" | \
-  bash 2>&1 | tail -50 || true
+# Create a modified version of the install script for testing
+# This uses the local package instead of the published npm package
+sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" \
+  "$WORKSPACE_ROOT/install.sh" > /tmp/install-local.sh
 
-# Verify installation
-if [ ! -f "nx.json" ]; then
-  echo "⚠️  nx.json not created, creating manually..."
-  cat > nx.json << 'NXJSON'
+# Run the install script with 'y' piped to accept prompts
+echo "y" | bash /tmp/install-local.sh || {
+  echo "⚠️  Install script had issues, ensuring basic setup..."
+
+  # Fallback: ensure package.json and nx are installed
+  if [ ! -f "package.json" ]; then
+    pnpm init -y
+  fi
+
+  if [ ! -d "node_modules/nx" ]; then
+    pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+  fi
+
+  if [ ! -f "nx.json" ]; then
+    cat > nx.json << 'NXJSON'
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "plugins": [
@@ -54,17 +64,11 @@ if [ ! -f "nx.json" ]; then
   ]
 }
 NXJSON
-fi
+  fi
+}
 
-# Ensure nx-make is installed with local version
-if [ ! -d "node_modules/nx-make" ] && [ ! -L "node_modules/nx-make" ]; then
-  echo "📦 Installing local nx-make..."
-  pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
-fi
-
-# Reset Nx cache
-echo "🔄 Resetting Nx cache..."
-npx nx reset 2>&1 | grep -E "NX|Success" || true
+# Clean up temp file
+rm -f /tmp/install-local.sh
 
 echo ""
 echo "✅ Test workspace setup complete!"
