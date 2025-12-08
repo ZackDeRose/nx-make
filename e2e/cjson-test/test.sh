@@ -79,6 +79,39 @@ echo "🧪 Running E2E Tests..."
 echo "======================="
 echo ""
 
+# Test 0: Verify setup
+echo "Test 0: Installation Verification"
+echo "-----------------------------------"
+
+# Check Nx version
+NX_VERSION=$(npx nx --version 2>&1 | grep "Local:" | awk '{print $3}' | sed 's/v//')
+NX_MAJOR=$(echo $NX_VERSION | cut -d. -f1)
+if [ "$NX_MAJOR" -ge 22 ]; then
+  echo "✅ Nx version: $NX_VERSION (>= 22.0.0)"
+else
+  echo "❌ Nx version $NX_VERSION is too old (need >= 22.0.0)"
+  exit 1
+fi
+
+# Check .gitignore configuration
+if [ -f ".gitignore" ]; then
+  MISSING_PATTERNS=()
+  if ! grep -q "node_modules" .gitignore; then
+    MISSING_PATTERNS+=("node_modules")
+  fi
+  if ! grep -q ".nx" .gitignore; then
+    MISSING_PATTERNS+=(".nx")
+  fi
+
+  if [ ${#MISSING_PATTERNS[@]} -eq 0 ]; then
+    echo "✅ .gitignore properly configured (node_modules, .nx)"
+  else
+    echo "⚠️  .gitignore missing patterns: ${MISSING_PATTERNS[*]}"
+  fi
+else
+  echo "⚠️  .gitignore not found"
+fi
+
 # Test 1: Verify project is discovered (auto-named from directory)
 echo "Test 1: Project Discovery"
 echo "-------------------------"

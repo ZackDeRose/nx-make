@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TEST_DIR="$SCRIPT_DIR/workspace"
+TEST_DIR="$SCRIPT_DIR/workspace-manual"
 CJSON_COMMIT="v1.7.18"
 
 echo "🧪 E2E Test: nx-make with cJSON library (MANUAL MODE)"
@@ -35,14 +35,43 @@ git checkout "$CJSON_COMMIT"
 echo "📦 Running nx-make installation script..."
 echo "   (Using local version for testing)"
 
-# Use the local install script
-# Point to local package for testing instead of published npm package
-cat "$WORKSPACE_ROOT/install.sh" | \
-  sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" | \
-  bash 2>&1 | tail -50 || true
+# Create a modified version of the install script for testing
+# This uses the local package instead of the published npm package
+sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" \
+  "$WORKSPACE_ROOT/install.sh" > /tmp/install-local.sh
+
+# Run the install script with 'y' piped to accept prompts
+echo "y" | bash /tmp/install-local.sh || {
+  echo "⚠️  Install script had issues, ensuring basic setup..."
+
+  # Fallback: ensure package.json and nx are installed
+  if [ ! -f "package.json" ]; then
+    pnpm init -y
+  fi
+
+  if [ ! -d "node_modules/nx" ]; then
+    pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+  fi
+
+  if [ ! -f "nx.json" ]; then
+    cat > nx.json << 'NXJSON'
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "plugins": [
+    {
+      "plugin": "nx-make"
+    }
+  ]
+}
+NXJSON
+  fi
+}
+
+# Clean up temp file
+rm -f /tmp/install-local.sh
 
 # Override nx.json to use manual mode
-echo "⚙️  Configuring for manual (regex) mode..."
+echo "⚙️  Reconfiguring for manual (regex) mode..."
 cat > nx.json << 'NXJSON'
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
@@ -57,14 +86,7 @@ cat > nx.json << 'NXJSON'
 }
 NXJSON
 
-# Ensure nx-make is installed with local version
-if [ ! -d "node_modules/nx-make" ] && [ ! -L "node_modules/nx-make" ]; then
-  echo "📦 Installing local nx-make..."
-  pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
-fi
-
-# Reset Nx cache
-echo "🔄 Resetting Nx cache..."
+# Reset cache with new config
 npx nx reset 2>&1 | grep -E "NX|Success" || true
 
 echo ""
@@ -75,6 +97,39 @@ echo ""
 echo "🧪 Running E2E Tests..."
 echo "======================="
 echo ""
+
+# Test 0: Verify setup
+echo "Test 0: Installation Verification"
+echo "-----------------------------------"
+
+# Check Nx version
+NX_VERSION=$(npx nx --version 2>&1 | grep "Local:" | awk '{print $3}' | sed 's/v//')
+NX_MAJOR=$(echo $NX_VERSION | cut -d. -f1)
+if [ "$NX_MAJOR" -ge 22 ]; then
+  echo "✅ Nx version: $NX_VERSION (>= 22.0.0)"
+else
+  echo "❌ Nx version $NX_VERSION is too old (need >= 22.0.0)"
+  exit 1
+fi
+
+# Check .gitignore configuration
+if [ -f ".gitignore" ]; then
+  MISSING_PATTERNS=()
+  if ! grep -q "node_modules" .gitignore; then
+    MISSING_PATTERNS+=("node_modules")
+  fi
+  if ! grep -q ".nx" .gitignore; then
+    MISSING_PATTERNS+=(".nx")
+  fi
+
+  if [ ${#MISSING_PATTERNS[@]} -eq 0 ]; then
+    echo "✅ .gitignore properly configured (node_modules, .nx)"
+  else
+    echo "⚠️  .gitignore missing patterns: ${MISSING_PATTERNS[*]}"
+  fi
+else
+  echo "⚠️  .gitignore not found"
+fi
 
 # Test 1: Verify project is discovered (auto-named from directory)
 echo "Test 1: Project Discovery"
