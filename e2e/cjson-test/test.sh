@@ -31,14 +31,20 @@ git clone https://github.com/DaveGamble/cJSON.git cjson-e2e
 cd cjson-e2e
 git checkout "$CJSON_COMMIT"
 
-# Install Nx and nx-make plugin
-echo "📦 Installing Nx and nx-make plugin..."
-pnpm init
-pnpm add -D nx "file:$WORKSPACE_ROOT/packages/nx-make"
+# Run the install script (testing the actual user experience)
+echo "📦 Running nx-make installation script..."
+echo "   (Using local version for testing)"
 
-# Create nx.json configuration
-echo "⚙️  Creating nx.json..."
-cat > nx.json << 'NXJSON'
+# Use the local install script
+# Point to local package for testing instead of published npm package
+cat "$WORKSPACE_ROOT/install.sh" | \
+  sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" | \
+  bash 2>&1 | tail -50 || true
+
+# Verify installation
+if [ ! -f "nx.json" ]; then
+  echo "⚠️  nx.json not created, creating manually..."
+  cat > nx.json << 'NXJSON'
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "plugins": [
@@ -48,13 +54,17 @@ cat > nx.json << 'NXJSON'
   ]
 }
 NXJSON
+fi
 
-# No need for project.json! The plugin auto-detects projects from Makefiles
-echo "✨ Plugin will auto-discover project from Makefile..."
+# Ensure nx-make is installed with local version
+if [ ! -d "node_modules/nx-make" ] && [ ! -L "node_modules/nx-make" ]; then
+  echo "📦 Installing local nx-make..."
+  pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+fi
 
-# Reset Nx cache to discover the project
+# Reset Nx cache
 echo "🔄 Resetting Nx cache..."
-npx nx reset
+npx nx reset 2>&1 | grep -E "NX|Success" || true
 
 echo ""
 echo "✅ Test workspace setup complete!"

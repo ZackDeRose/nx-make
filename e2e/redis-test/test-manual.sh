@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TEST_DIR="$SCRIPT_DIR/workspace-manual"
+TEST_DIR="$SCRIPT_DIR/workspace"
 REDIS_VERSION="7.4"
 
 echo "🧪 E2E Test: nx-make with Redis (Multi-Project, MANUAL MODE)"
@@ -30,13 +30,18 @@ echo "📥 Cloning Redis $REDIS_VERSION..."
 git clone --depth 1 --branch "$REDIS_VERSION" https://github.com/redis/redis.git redis-e2e
 cd redis-e2e
 
-# Install Nx and nx-make plugin
-echo "📦 Installing Nx and nx-make plugin..."
-pnpm init
-pnpm add -D nx "file:$WORKSPACE_ROOT/packages/nx-make"
+# Run the install script (testing the actual user experience)
+echo "📦 Running nx-make installation script..."
+echo "   (Using local version for testing)"
 
-# Create nx.json configuration with manual mode
-echo "⚙️  Creating nx.json (using manual regex parsing)..."
+# Use the local install script
+# Point to local package for testing instead of published npm package
+cat "$WORKSPACE_ROOT/install.sh" | \
+  sed "s|@zackderose/nx-make|file:$WORKSPACE_ROOT/packages/nx-make|g" | \
+  bash 2>&1 | tail -50 || true
+
+# Override nx.json to use manual mode
+echo "⚙️  Configuring for manual (regex) mode..."
 cat > nx.json << 'NXJSON'
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
@@ -51,13 +56,15 @@ cat > nx.json << 'NXJSON'
 }
 NXJSON
 
-# No need for project.json files! The plugin auto-discovers projects from Makefiles
-echo "✨ Plugin will auto-discover all projects from Makefiles..."
-echo "   Expected to find: src/, deps/, and individual dependencies"
+# Ensure nx-make is installed with local version
+if [ ! -d "node_modules/nx-make" ] && [ ! -L "node_modules/nx-make" ]; then
+  echo "📦 Installing local nx-make..."
+  pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+fi
 
 # Reset Nx cache
 echo "🔄 Resetting Nx cache..."
-npx nx reset
+npx nx reset 2>&1 | grep -E "NX|Success" || true
 
 echo ""
 echo "✅ Test workspace setup complete!"

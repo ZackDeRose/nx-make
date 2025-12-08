@@ -114,8 +114,14 @@ if [ "$SKIP_NX_INIT" = false ]; then
   echo "⚙️  Initializing Nx..."
 
   if ! command -v nx &> /dev/null; then
-    echo "📦 Installing Nx..."
-    $PACKAGE_MANAGER add -D nx
+    echo "📦 Installing Nx (>= 22.0.0)..."
+    if [ "$PACKAGE_MANAGER" = "pnpm" ]; then
+      pnpm add -D "nx@>=22.0.0"
+    elif [ "$PACKAGE_MANAGER" = "yarn" ]; then
+      yarn add -D "nx@>=22.0.0"
+    else
+      npm install -D "nx@>=22.0.0"
+    fi
   fi
 fi
 
@@ -123,11 +129,11 @@ fi
 echo ""
 echo "📦 Installing @zackderose/nx-make..."
 if [ "$PACKAGE_MANAGER" = "pnpm" ]; then
-  pnpm add -D @zackderose/nx-make
+  pnpm add -D "nx@>=22.0.0" @zackderose/nx-make
 elif [ "$PACKAGE_MANAGER" = "yarn" ]; then
-  yarn add -D @zackderose/nx-make
+  yarn add -D "nx@>=22.0.0" @zackderose/nx-make
 else
-  npm install -D @zackderose/nx-make
+  npm install -D "nx@>=22.0.0" @zackderose/nx-make
 fi
 
 # Configure nx.json
