@@ -551,10 +551,23 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
 ) => {
   const dependencies: RawProjectGraphDependency[] = [];
 
-  console.log('[nx-make] createDependencies: Analyzing', Object.keys(context.projects).length, 'projects');
+  // Use filesToProcess for incremental analysis (only changed files)
+  const filesToProcess = context.filesToProcess;
+  const shouldProcessAll = !filesToProcess || Object.keys(filesToProcess.projectFileMap).length === 0;
+
+  if (shouldProcessAll) {
+    console.log('[nx-make] Full scan: Analyzing all projects');
+  } else {
+    console.log('[nx-make] Incremental: Analyzing', Object.keys(filesToProcess.projectFileMap).length, 'changed projects');
+  }
 
   // Analyze each project for C file includes
   for (const [projectName, projectConfig] of Object.entries(context.projects)) {
+    // Skip projects with no changed files (incremental mode)
+    if (!shouldProcessAll && !filesToProcess?.projectFileMap[projectName]) {
+      continue;
+    }
+
     const projectRoot = projectConfig.root || projectName;
     const projectAbsPath = join(context.workspaceRoot, projectRoot);
 
