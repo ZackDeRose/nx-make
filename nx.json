@@ -6,6 +6,28 @@
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
   "nxCloudId": "693496ebed4be5753c487d75",
+  "release": {
+    "projects": ["packages/nx-make"],
+    "projectsRelationship": "independent",
+    "changelog": {
+      "workspaceChangelog": false,
+      "projectChangelogs": {
+        "file": "{projectRoot}/CHANGELOG.md",
+        "renderOptions": {
+          "authors": true,
+          "commitReferences": true
+        }
+      }
+    },
+    "version": {
+      "conventionalCommits": true
+    },
+    "git": {
+      "commit": true,
+      "tag": true,
+      "stageChanges": true
+    }
+  },
   "plugins": [
     {
       "plugin": "@nx/js/typescript",
