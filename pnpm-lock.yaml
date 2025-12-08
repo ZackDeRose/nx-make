@@ -61,15 +61,6 @@ importers:
         specifier: ~5.9.2
         version: 5.9.3
 
-  e2e/redis-test/workspace/redis-e2e:
-    devDependencies:
-      '@zackderose/nx-make':
-        specifier: file:/Users/zackderose/nx-make/packages/nx-make
-        version: file:packages/nx-make(nx@22.1.3(@swc-node/register@1.9.2(@swc/core@1.5.29(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.5.29(@swc/helpers@0.5.17)))
-      nx:
-        specifier: 22.1.3
-        version: 22.1.3(@swc-node/register@1.9.2(@swc/core@1.5.29(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.5.29(@swc/helpers@0.5.17))
-
   packages/nx-make:
     dependencies:
       '@nx/devkit':
@@ -1445,14 +1436,6 @@ packages:
   '@yarnpkg/parsers@3.0.2':
     resolution: {integrity: sha512-/HcYgtUSiJiot/XWGLOlGxPYUG65+/31V8oqk17vZLW1xlCoR4PampyePljOxY2n8/3jz9+tIFzICsyGujJZoA==}
     engines: {node: '>=18.12.0'}
-
-  '@zackderose/nx-make@file:packages/nx-make':
-    resolution: {directory: packages/nx-make, type: directory}
-    engines: {node: '>=18.0.0'}
-    cpu: [x64, arm64]
-    os: [darwin, linux, win32]
-    peerDependencies:
-      nx: '>= 22.0.0'
 
   '@zkochan/js-yaml@0.0.7':
     resolution: {integrity: sha512-nrUSn7hzt7J6JWgWGz78ZYI8wj+gdIJdk0Ynjpp8l+trkn58Uqsf6RYrYkEK+3X18EX+TNdtJI0WxAtc+L84SQ==}
@@ -4531,7 +4514,7 @@ snapshots:
       '@swc-node/sourcemap-support': 0.5.1
       '@swc/core': 1.5.29(@swc/helpers@0.5.17)
       colorette: 2.0.20
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@5.5.0)
       pirates: 4.0.7
       tslib: 2.8.1
       typescript: 5.9.3
@@ -4858,12 +4841,6 @@ snapshots:
   '@yarnpkg/parsers@3.0.2':
     dependencies:
       js-yaml: 3.14.2
-      tslib: 2.8.1
-
-  '@zackderose/nx-make@file:packages/nx-make(nx@22.1.3(@swc-node/register@1.9.2(@swc/core@1.5.29(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.5.29(@swc/helpers@0.5.17)))':
-    dependencies:
-      '@nx/devkit': 22.1.3(nx@22.1.3(@swc-node/register@1.9.2(@swc/core@1.5.29(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.5.29(@swc/helpers@0.5.17)))
-      nx: 22.1.3(@swc-node/register@1.9.2(@swc/core@1.5.29(@swc/helpers@0.5.17))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.5.29(@swc/helpers@0.5.17))
       tslib: 2.8.1
 
   '@zkochan/js-yaml@0.0.7':
@@ -5201,10 +5178,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  debug@4.4.3:
-    dependencies:
-      ms: 2.1.3
 
   debug@4.4.3(supports-color@5.5.0):
     dependencies:
