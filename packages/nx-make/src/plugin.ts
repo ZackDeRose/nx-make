@@ -23,6 +23,13 @@ export interface MakePluginOptions {
    * Throws an error if the specified compiler is not available.
    */
   dependencyCompiler?: 'gcc' | 'clang' | 'manual';
+  /**
+   * Maximum number of source files to analyze per project for dependency detection
+   * Set lower for faster graph calculation in large projects
+   * Default: undefined (analyze all files)
+   * Recommended for large projects: 10-20
+   */
+  maxFilesToAnalyze?: number;
 }
 
 const MAKEFILE_GLOB = '**/Makefile';
@@ -255,9 +262,11 @@ function scanForIncludesWithCompiler(
   projectDir: string,
   projectRoot: string,
   compiler: string,
-  workspaceRoot: string
+  workspaceRoot: string,
+  maxFiles?: number
 ): Map<string, string> {
   const includes: Map<string, string> = new Map();
+  let filesProcessed = 0;
 
   // Try to extract include paths from the project's Makefile
   const makefilePath = join(projectDir, 'Makefile');
@@ -265,6 +274,7 @@ function scanForIncludesWithCompiler(
 
   function scanDirectory(dir: string) {
     if (!existsSync(dir)) return;
+    if (maxFiles && filesProcessed >= maxFiles) return;
 
     try {
       const entries = readdirSync(dir);
@@ -280,6 +290,8 @@ function scanForIncludesWithCompiler(
         if (stat.isDirectory()) {
           scanDirectory(fullPath);
         } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
+          if (maxFiles && filesProcessed >= maxFiles) return;
+
           const deps = getDependenciesFromCompiler(fullPath, projectDir, compiler, includePaths);
           const relativeFilePath = fullPath.replace(projectDir + '/', '');
           const sourceFile = join(projectRoot, relativeFilePath);
@@ -288,6 +300,8 @@ function scanForIncludesWithCompiler(
             const normalizedDep = dep.replace(/\\/g, '/');
             includes.set(normalizedDep, sourceFile);
           }
+
+          filesProcessed++;
         }
       }
     } catch {
@@ -317,7 +331,7 @@ function scanForIncludes(
   }
 
   // Use compiler-based detection with Makefile include paths
-  return scanForIncludesWithCompiler(projectDir, projectRoot, compiler, workspaceRoot);
+  return scanForIncludesWithCompiler(projectDir, projectRoot, compiler, workspaceRoot, options?.maxFilesToAnalyze);
 }
 
 /**
