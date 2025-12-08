@@ -220,6 +220,28 @@ done
 
 echo -e "${GREEN}✅ Updated .gitignore with Nx patterns${NC}"
 
+# Prime the Nx daemon
+echo ""
+echo "🔧 Priming Nx daemon (calculating project graph)..."
+echo -n "   "
+
+# Show a simple spinner while priming
+(
+  npx nx show projects > /dev/null 2>&1
+) &
+PRIME_PID=$!
+
+# Simple spinner
+SPIN='-\|/'
+i=0
+while kill -0 $PRIME_PID 2>/dev/null; do
+  i=$(( (i+1) %4 ))
+  printf "\r   ${SPIN:$i:1} Calculating project graph..."
+  sleep .1
+done
+
+printf "\r   ✓ Project graph ready!                    \n"
+
 # Success!
 echo ""
 echo -e "${BOLD}${GREEN}✅ Installation Complete!${NC}"
