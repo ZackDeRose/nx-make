@@ -21,6 +21,23 @@ An Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph.
 
 ## Installation
 
+### Quick Install (Recommended)
+
+For existing C/Make projects, use the installation script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ZackDeRose/nx-make/main/install.sh | bash
+```
+
+This automated script will:
+- ✅ Check for Node.js and offer to install via nvm
+- ✅ Initialize Nx in your project
+- ✅ Install @zackderose/nx-make
+- ✅ Configure nx.json automatically
+- ✅ Verify gcc/clang for dependency detection
+
+### Manual Installation
+
 ```bash
 npm install -D @zackderose/nx-make
 ```

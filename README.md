@@ -16,6 +16,23 @@ This repository contains the source code for the `nx-make` plugin, which enables
 
 ## Installation
 
+### Quick Install (Recommended)
+
+For existing C/Make projects, use the installation script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ZackDeRose/nx-make/main/install.sh | bash
+```
+
+This will:
+- Check for Node.js and offer to install it
+- Add Nx to your project
+- Install @zackderose/nx-make
+- Configure nx.json
+- Verify gcc/clang availability
+
+### Manual Installation
+
 ```bash
 npm install -D @zackderose/nx-make
 ```
