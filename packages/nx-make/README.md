@@ -22,15 +22,15 @@ An Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph.
 ## Installation
 
 ```bash
-npm install -D nx-make
+npm install -D @zackderose/nx-make
 ```
 
 ```bash
-pnpm add -D nx-make
+pnpm add -D @zackderose/nx-make
 ```
 
 ```bash
-yarn add -D nx-make
+yarn add -D @zackderose/nx-make
 ```
 
 ### Verifying Requirements

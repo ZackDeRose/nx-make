@@ -1,7 +1,10 @@
 {
-  "name": "nx-make",
+  "name": "@zackderose/nx-make",
   "version": "1.0.0",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Nx plugin to integrate Make/Makefile tasks into the Nx dependency graph",
   "author": "Zack DeRose <zack.derose@gmail.com>",
   "license": "MIT",

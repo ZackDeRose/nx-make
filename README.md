@@ -17,15 +17,15 @@ This repository contains the source code for the `nx-make` plugin, which enables
 ## Installation
 
 ```bash
-npm install -D nx-make
+npm install -D @zackderose/nx-make
 ```
 
 ```bash
-pnpm add -D nx-make
+pnpm add -D @zackderose/nx-make
 ```
 
 ```bash
-yarn add -D nx-make
+yarn add -D @zackderose/nx-make
 ```
 
 ## Quick Start
