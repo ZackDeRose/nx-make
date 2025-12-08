@@ -26,6 +26,9 @@
       "commit": true,
       "tag": true,
       "stageChanges": true
+    },
+    "release": {
+      "createRelease": "github"
     }
   },
   "plugins": [
