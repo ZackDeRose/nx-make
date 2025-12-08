@@ -138,8 +138,8 @@ function extractIncludePathsFromMakefile(makefilePath: string): string[] {
 
     const paths = Array.from(includePaths);
 
-    // Debug logging - remove after testing
-    if (paths.length > 0 && makefilePath.includes('src/Makefile')) {
+    // Debug logging
+    if (paths.length > 0) {
       console.log(`[nx-make] Extracted ${paths.length} include paths from ${makefilePath}:`, paths);
     }
 
@@ -183,9 +183,18 @@ function getDependenciesFromCompiler(
       .split(/\s+/)
       .filter(dep => dep && dep !== sourceFile);
 
+    // Debug: show what gcc -MM found
+    const depsFromOtherProjects = deps.filter(d => d.includes('../deps'));
+    if (depsFromOtherProjects.length > 0) {
+      console.log(`[nx-make] gcc -MM found ${depsFromOtherProjects.length} deps in other projects from ${sourceFile}:`, depsFromOtherProjects.slice(0, 3));
+    }
+
     return deps;
-  } catch {
-    // If compiler fails (file doesn't compile, etc.), return empty
+  } catch (e) {
+    // Debug: show compilation errors
+    if (sourceFile.includes('redis-cli')) {
+      console.log(`[nx-make] gcc -MM failed for ${sourceFile}:`, (e as Error).message);
+    }
     return [];
   }
 }
@@ -376,7 +385,7 @@ function createTargetsForMakefile(
       : makeTarget;
 
     const targetConfig: TargetConfiguration = {
-      executor: 'nx-make:make',
+      executor: '@zackderose/nx-make:make',
       options: {
         target: makeTarget,
         cwd: projectRoot,
@@ -542,6 +551,8 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
 ) => {
   const dependencies: RawProjectGraphDependency[] = [];
 
+  console.log('[nx-make] createDependencies: Analyzing', Object.keys(context.projects).length, 'projects');
+
   // Analyze each project for C file includes
   for (const [projectName, projectConfig] of Object.entries(context.projects)) {
     const projectRoot = projectConfig.root || projectName;
@@ -549,6 +560,8 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
 
     // Scan for #include statements in this project (returns Map<includePath, sourceFile>)
     const includes = scanForIncludes(projectAbsPath, projectRoot, context.workspaceRoot, options);
+
+    console.log(`[nx-make] Project "${projectName}": found ${includes.size} total includes`);
 
     // Map include paths to actual project dependencies
     const projectDependencies = mapIncludesToProjectNames(
@@ -558,6 +571,11 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
       context.projects,
       context.workspaceRoot
     );
+
+    console.log(`[nx-make] Project "${projectName}": mapped to ${projectDependencies.size} project dependencies`);
+    for (const [target, files] of projectDependencies) {
+      console.log(`[nx-make]   → depends on "${target}" (from ${files.length} files)`);
+    }
 
     // Create static dependencies for each detected include
     for (const [targetProject, sourceFiles] of projectDependencies) {
@@ -575,11 +593,13 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
       try {
         validateDependency(dependency, context);
         dependencies.push(dependency);
-      } catch {
-        // Skip invalid dependencies silently
+        console.log(`[nx-make] ✓ Added dependency: ${projectName} → ${targetProject}`);
+      } catch (e) {
+        console.log(`[nx-make] ✗ Failed to add dependency: ${projectName} → ${targetProject}:`, (e as Error).message);
       }
     }
   }
 
+  console.log(`[nx-make] Total dependencies added: ${dependencies.length}`);
   return dependencies;
 };

@@ -46,11 +46,11 @@ echo "y" | bash /tmp/install-local.sh || {
 
   # Fallback: ensure package.json and nx are installed
   if [ ! -f "package.json" ]; then
-    pnpm init -y
+    pnpm init
   fi
 
   if [ ! -d "node_modules/nx" ]; then
-    pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+    pnpm add -D -w "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
   fi
 
   if [ ! -f "nx.json" ]; then
