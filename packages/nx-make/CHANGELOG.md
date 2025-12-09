@@ -1,3 +1,7 @@
+## 1.1.0 (2025-12-09)
+
+This was a version bump only for @zackderose/nx-make to align it with other projects, there were no code changes.
+
 ## 1.0.4 (2025-12-09)
 
 This was a version bump only for @zackderose/nx-make to align it with other projects, there were no code changes.
