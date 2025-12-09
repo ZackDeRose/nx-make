@@ -141,6 +141,38 @@ else
   exit 1
 fi
 
+# Test 2b: Verify bucket project dependencies
+echo ""
+echo "Test 2b: Bucket Project Dependencies"
+echo "-------------------------------------"
+echo "The 'deps' project should depend on all deps-* sub-projects"
+echo ""
+
+# Get deps project dependencies
+DEPS_PROJECT_DEPS=$(npx nx show project deps --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null)
+
+echo "Checking if 'deps' bucket depends on sub-projects:"
+EXPECTED_SUBS=("deps-hiredis" "deps-lua" "deps-linenoise")
+BUCKET_FOUND=0
+
+for sub in "${EXPECTED_SUBS[@]}"; do
+  if echo "$DEPS_PROJECT_DEPS" | grep -q "$sub"; then
+    echo "✅ deps → $sub"
+    BUCKET_FOUND=$((BUCKET_FOUND + 1))
+  else
+    echo "❌ MISSING: deps → $sub"
+  fi
+done
+
+if [ $BUCKET_FOUND -ge 2 ]; then
+  echo ""
+  echo "✅ Bucket dependencies working ($BUCKET_FOUND found)"
+else
+  echo ""
+  echo "❌ FAILED: Bucket project not depending on sub-projects"
+  exit 1
+fi
+
 # Test 3: Build a dependency
 echo ""
 echo "Test 3: Build Individual Dependency"

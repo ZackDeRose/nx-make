@@ -617,6 +617,52 @@ function deriveProjectName(projectRoot: string): string {
   return parts.join('-');
 }
 
+/**
+ * Detects if a project is a "bucket" project (has sub-projects but no source files)
+ * Returns the names of sub-projects
+ */
+function findSubProjects(
+  projectDir: string,
+  projectRoot: string
+): string[] {
+  const subProjects: string[] = [];
+
+  if (!existsSync(projectDir)) {
+    return subProjects;
+  }
+
+  try {
+    const entries = readdirSync(projectDir);
+
+    for (const entry of entries) {
+      const fullPath = join(projectDir, entry);
+
+      if (EXCLUDE_DIRS.includes(entry)) {
+        continue;
+      }
+
+      try {
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+          const subMakefile = join(fullPath, 'Makefile');
+          if (existsSync(subMakefile)) {
+            // This subdirectory is a project - derive its name
+            const subProjectRoot = join(projectRoot, entry);
+            const subProjectName = deriveProjectName(subProjectRoot);
+            subProjects.push(subProjectName);
+          }
+        }
+      } catch {
+        // Skip entries we can't access
+      }
+    }
+  } catch {
+    // Skip if can't read directory
+  }
+
+  return subProjects;
+}
+
 function createNodesInternal(
   makefilePath: string,
   options: MakePluginOptions,
@@ -624,6 +670,7 @@ function createNodesInternal(
 ): CreateNodesResult {
   const projectRoot = dirname(makefilePath);
   const absoluteMakefilePath = join(context.workspaceRoot, makefilePath);
+  const projectDir = join(context.workspaceRoot, projectRoot);
 
   // Derive project name from directory path
   const projectName = deriveProjectName(projectRoot);
@@ -635,13 +682,22 @@ function createNodesInternal(
     options
   );
 
+  // Check if this is a bucket project with sub-projects
+  const subProjects = findSubProjects(projectDir, projectRoot);
+  const projectConfig: any = {
+    name: projectName,
+    targets,
+  };
+
+  // If this is a bucket project, add implicit dependencies to sub-projects
+  if (subProjects.length > 0) {
+    projectConfig.implicitDependencies = subProjects;
+    console.log(`[nx-make] Bucket project "${projectName}" depends on ${subProjects.length} sub-projects:`, subProjects);
+  }
+
   return {
     projects: {
-      [projectRoot]: {
-        name: projectName,
-        targets,
-        // Dependencies will be detected via createDependencies API
-      },
+      [projectRoot]: projectConfig,
     },
   };
 }
