@@ -87,47 +87,44 @@ npx nx show projects | while read proj; do
   echo "  - $proj"
 done
 
-# Test 2: Verify dependencies are detected
+# Test 2: Verify dependency detection (FOCUSED TEST)
 echo ""
-echo "Test 2: Dependency Detection (CRITICAL)"
-echo "----------------------------------------"
-echo "Redis src/ includes headers from deps/ subdirectories."
-echo "Expected: src should depend on deps-hiredis, deps-lua, deps-fast_float, etc."
+echo "Test 2: Dependency Detection - fast_float Test Case"
+echo "---------------------------------------------------"
+echo "Test case: src/debug.c includes 'fast_float_strtod.h' from deps/fast_float"
+echo "Expected: src → deps-fast_float dependency"
 echo ""
 
-# Get actual dependencies
-SRC_DEPS=$(npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null || echo "")
+# Check what gcc -MM returns for this specific file
+if [ -f "src/debug.c" ]; then
+  echo "🔍 Testing gcc -MM on src/debug.c..."
+  cd src
+  GCC_OUTPUT=$(gcc -MM -I../deps/fast_float debug.c 2>&1 | head -5)
+  echo "gcc -MM output:"
+  echo "$GCC_OUTPUT"
+  echo ""
+  cd ..
+fi
 
-# Check for expected dependencies
-EXPECTED_DEPS=("deps-hiredis" "deps-lua" "deps-linenoise")
-MISSING_DEPS=()
+# Get actual dependencies for src project
+SRC_DEPS=$(npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null)
 
-for expected in "${EXPECTED_DEPS[@]}"; do
-  if echo "$SRC_DEPS" | grep -q "$expected"; then
-    echo "✅ Found dependency: src → $expected"
-  else
-    echo "❌ MISSING dependency: src → $expected"
-    MISSING_DEPS+=("$expected")
-  fi
-done
-
-echo ""
-if [ ${#MISSING_DEPS[@]} -eq 0 ]; then
-  echo "✅ All expected dependencies detected!"
+echo "Actual dependencies for 'src' project:"
+if [ -n "$SRC_DEPS" ]; then
+  echo "$SRC_DEPS" | while read dep; do echo "  → $dep"; done
 else
-  echo "❌ Missing ${#MISSING_DEPS[@]} dependencies: ${MISSING_DEPS[*]}"
+  echo "  (none)"
+fi
+echo ""
+
+# Check for the specific fast_float dependency
+if echo "$SRC_DEPS" | grep -q "fast_float"; then
+  echo "✅ SUCCESS: src → deps-fast_float dependency detected!"
+else
+  echo "❌ FAILED: src → deps-fast_float dependency NOT detected"
   echo ""
-  echo "Example: src/debug.c includes 'fast_float_strtod.h' from deps/fast_float"
-  echo "This should create an edge: src → deps-fast_float"
-  echo ""
-  echo "Actual dependencies found:"
-  if [ -n "$SRC_DEPS" ]; then
-    echo "$SRC_DEPS" | while read dep; do echo "  → $dep"; done
-  else
-    echo "  (none)"
-  fi
-  echo ""
-  echo "⚠️  Dependency detection needs fixing!"
+  echo "This is the focused test case that must pass."
+  exit 1
 fi
 
 # Test 3: Build a dependency
