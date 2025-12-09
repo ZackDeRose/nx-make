@@ -403,7 +403,13 @@ function inferDependenciesFromIncludePaths(
   const includePaths = extractIncludePathsFromMakefile(makefilePath);
   const dependencies: Set<string> = new Set();
 
+  console.log(`[nx-make]   inferDependenciesFromIncludePaths for "${projectName}": extracted ${includePaths.length} -I paths`);
+  if (includePaths.length > 0) {
+    console.log(`[nx-make]     Paths:`, includePaths);
+  }
+
   for (const includePath of includePaths) {
+    console.log(`[nx-make]     Checking ${includePath}...`);
     const owningProject = findProjectForIncludePath(
       includePath,
       projectRoot,
@@ -413,7 +419,9 @@ function inferDependenciesFromIncludePaths(
 
     if (owningProject && owningProject !== projectName) {
       dependencies.add(owningProject);
-      console.log(`[nx-make] Include path ${includePath} → project "${owningProject}"`);
+      console.log(`[nx-make]       ✓ Maps to project "${owningProject}"`);
+    } else {
+      console.log(`[nx-make]       ✗ No project found (or same project)`);
     }
   }
 

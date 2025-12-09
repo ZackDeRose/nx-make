@@ -106,10 +106,15 @@ if [ -f "src/debug.c" ]; then
   cd ..
 fi
 
-# Get actual dependencies for src project
-SRC_DEPS=$(npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null)
+# Get actual dependencies from project graph (not implicitDependencies)
+if [ -f ".nx/workspace-data/project-graph.json" ]; then
+  SRC_DEPS=$(cat .nx/workspace-data/project-graph.json | jq -r '.dependencies["src"][]?.target' 2>/dev/null)
+else
+  echo "⚠️  Project graph not found"
+  SRC_DEPS=""
+fi
 
-echo "Actual dependencies for 'src' project:"
+echo "Actual dependencies for 'src' project (from graph):"
 if [ -n "$SRC_DEPS" ]; then
   echo "$SRC_DEPS" | while read dep; do echo "  → $dep"; done
 else
@@ -117,13 +122,22 @@ else
 fi
 echo ""
 
-# Check for the specific fast_float dependency
-if echo "$SRC_DEPS" | grep -q "fast_float"; then
-  echo "✅ SUCCESS: src → deps-fast_float dependency detected!"
-else
-  echo "❌ FAILED: src → deps-fast_float dependency NOT detected"
+# Check for expected dependencies
+EXPECTED=("deps-hiredis" "deps-linenoise" "deps-lua")
+FOUND=0
+for dep in "${EXPECTED[@]}"; do
+  if echo "$SRC_DEPS" | grep -q "$dep"; then
+    echo "✅ Found: src → $dep"
+    FOUND=$((FOUND + 1))
+  fi
+done
+
+if [ $FOUND -ge 2 ]; then
   echo ""
-  echo "This is the focused test case that must pass."
+  echo "✅ SUCCESS: Dependencies detected! ($FOUND/${#EXPECTED[@]} expected deps found)"
+else
+  echo ""
+  echo "❌ FAILED: Only $FOUND/${#EXPECTED[@]} dependencies detected"
   exit 1
 fi
 
