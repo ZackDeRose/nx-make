@@ -354,18 +354,22 @@ function scanForIncludes(
 }
 
 /**
- * Finds which project owns a given file path
+ * Finds which project owns a directory path (from -I flags)
  * Returns the project name or null if no project found
+ * Example: For -I../deps/hiredis, finds the project at deps/hiredis
  */
-function findProjectForFile(
-  filePath: string,
+function findProjectForIncludePath(
+  includePath: string,
   currentProjectRoot: string,
   allProjects: Record<string, { root: string }>,
   workspaceRoot: string
 ): string | null {
-  // Resolve the include path to an absolute path
+  // Remove -I prefix if present
+  const cleanPath = includePath.replace(/^-I/, '');
+
+  // Resolve to absolute path from current project
   const currentProjectDir = join(workspaceRoot, currentProjectRoot);
-  const resolvedPath = join(currentProjectDir, filePath);
+  const resolvedPath = join(currentProjectDir, cleanPath);
 
   // Find the project with the longest matching root
   let bestMatch: { name: string; rootLength: number } | null = null;
@@ -373,8 +377,8 @@ function findProjectForFile(
   for (const [projectName, project] of Object.entries(allProjects)) {
     const projectAbsPath = join(workspaceRoot, project.root);
 
-    // Check if the resolved file is within this project's root
-    if (resolvedPath.startsWith(projectAbsPath + '/') || resolvedPath.startsWith(projectAbsPath + '\\')) {
+    // Check if the include path points to this project's root
+    if (resolvedPath === projectAbsPath || resolvedPath.startsWith(projectAbsPath + '/') || resolvedPath.startsWith(projectAbsPath + '\\')) {
       const rootLength = projectAbsPath.length;
       if (!bestMatch || rootLength > bestMatch.rootLength) {
         bestMatch = { name: projectName, rootLength };
@@ -383,6 +387,37 @@ function findProjectForFile(
   }
 
   return bestMatch?.name || null;
+}
+
+/**
+ * Infers dependencies from Makefile -I include paths
+ * More robust than gcc -MM since it doesn't require files to exist
+ */
+function inferDependenciesFromIncludePaths(
+  makefilePath: string,
+  projectName: string,
+  projectRoot: string,
+  allProjects: Record<string, { root: string }>,
+  workspaceRoot: string
+): string[] {
+  const includePaths = extractIncludePathsFromMakefile(makefilePath);
+  const dependencies: Set<string> = new Set();
+
+  for (const includePath of includePaths) {
+    const owningProject = findProjectForIncludePath(
+      includePath,
+      projectRoot,
+      allProjects,
+      workspaceRoot
+    );
+
+    if (owningProject && owningProject !== projectName) {
+      dependencies.add(owningProject);
+      console.log(`[nx-make] Include path ${includePath} → project "${owningProject}"`);
+    }
+  }
+
+  return Array.from(dependencies);
 }
 
 /**
@@ -409,7 +444,7 @@ function mapIncludesToProjectNames(
     console.log(`[nx-make]   Include "${includePath}"`);
 
     // Find which project owns this included file
-    const owningProject = findProjectForFile(
+    const owningProject = findProjectForIncludePath(
       includePath,
       projectRoot,
       allProjects,
@@ -623,7 +658,7 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
     console.log('[nx-make] Incremental: Analyzing', Object.keys(filesToProcess.projectFileMap).length, 'changed projects');
   }
 
-  // Analyze each project for C file includes
+  // Analyze each project for dependencies
   for (const [projectName, projectConfig] of Object.entries(context.projects)) {
     // Skip projects with no changed files (incremental mode)
     if (!shouldProcessAll && !filesToProcess?.projectFileMap[projectName]) {
@@ -632,16 +667,40 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
 
     const projectRoot = projectConfig.root || projectName;
     const projectAbsPath = join(context.workspaceRoot, projectRoot);
+    const makefilePath = join(projectAbsPath, 'Makefile');
 
-    // Scan for #include statements in this project (returns Map<includePath, sourceFile>)
-    const includes = scanForIncludes(projectAbsPath, projectRoot, context.workspaceRoot, options);
+    // Method 1: Infer from Makefile -I paths (most reliable, doesn't need built deps)
+    const depsFromIncludePaths = inferDependenciesFromIncludePaths(
+      makefilePath,
+      projectName,
+      projectRoot,
+      context.projects,
+      context.workspaceRoot
+    );
 
-    console.log(`[nx-make] Project "${projectName}": found ${includes.size} total includes`);
-    if (includes.size > 0 && projectName === 'hello-world') {
-      console.log(`[nx-make]   Includes:`, Array.from(includes.keys()).slice(0, 5));
+    console.log(`[nx-make] Project "${projectName}": found ${depsFromIncludePaths.length} dependencies from Makefile -I paths`);
+
+    // Create dependencies from include paths
+    for (const targetProject of depsFromIncludePaths) {
+      const dependency: RawProjectGraphDependency = {
+        source: projectName,
+        target: targetProject,
+        type: DependencyType.static,
+        sourceFile: join(projectRoot, 'Makefile'), // Dependency declared in Makefile
+      };
+
+      try {
+        validateDependency(dependency, context);
+        dependencies.push(dependency);
+        console.log(`[nx-make] ✓ Added dependency: ${projectName} → ${targetProject} (from Makefile -I)`);
+      } catch (e) {
+        console.log(`[nx-make] ✗ Failed: ${projectName} → ${targetProject}:`, (e as Error).message);
+      }
     }
 
-    // Map include paths to actual project dependencies
+    // Method 2: Scan source files with gcc -MM (when deps are built)
+    // This is kept for additional validation but -I method is primary
+    const includes = scanForIncludes(projectAbsPath, projectRoot, context.workspaceRoot, options);
     const projectDependencies = mapIncludesToProjectNames(
       projectName,
       projectRoot,
