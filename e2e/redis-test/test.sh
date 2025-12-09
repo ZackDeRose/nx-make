@@ -89,24 +89,46 @@ done
 
 # Test 2: Verify dependencies are detected
 echo ""
-echo "Test 2: Dependency Detection"
-echo "----------------------------"
-echo "Checking if src depends on any deps..."
-
-# Check the project graph for dependencies
-GRAPH_JSON=$(npx nx graph --file=test-graph.json 2>&1)
-if npx nx show project src --json 2>/dev/null | grep -q "hiredis\|lua\|jemalloc"; then
-  echo "✅ Dependencies detected in project graph!"
-else
-  echo "⚠️  Checking for inferred dependencies from #include statements..."
-fi
-
-# Show what src depends on
+echo "Test 2: Dependency Detection (CRITICAL)"
+echo "----------------------------------------"
+echo "Redis src/ includes headers from deps/ subdirectories."
+echo "Expected: src should depend on deps-hiredis, deps-lua, deps-fast_float, etc."
 echo ""
-echo "Dependencies analysis:"
-npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null | while read dep; do
-  echo "  → $dep"
-done || echo "  (Dependencies detected via createDependencies API)"
+
+# Get actual dependencies
+SRC_DEPS=$(npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null || echo "")
+
+# Check for expected dependencies
+EXPECTED_DEPS=("deps-hiredis" "deps-lua" "deps-linenoise")
+MISSING_DEPS=()
+
+for expected in "${EXPECTED_DEPS[@]}"; do
+  if echo "$SRC_DEPS" | grep -q "$expected"; then
+    echo "✅ Found dependency: src → $expected"
+  else
+    echo "❌ MISSING dependency: src → $expected"
+    MISSING_DEPS+=("$expected")
+  fi
+done
+
+echo ""
+if [ ${#MISSING_DEPS[@]} -eq 0 ]; then
+  echo "✅ All expected dependencies detected!"
+else
+  echo "❌ Missing ${#MISSING_DEPS[@]} dependencies: ${MISSING_DEPS[*]}"
+  echo ""
+  echo "Example: src/debug.c includes 'fast_float_strtod.h' from deps/fast_float"
+  echo "This should create an edge: src → deps-fast_float"
+  echo ""
+  echo "Actual dependencies found:"
+  if [ -n "$SRC_DEPS" ]; then
+    echo "$SRC_DEPS" | while read dep; do echo "  → $dep"; done
+  else
+    echo "  (none)"
+  fi
+  echo ""
+  echo "⚠️  Dependency detection needs fixing!"
+fi
 
 # Test 3: Build a dependency
 echo ""

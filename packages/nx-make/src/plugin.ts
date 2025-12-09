@@ -8,7 +8,7 @@ import type {
   TargetConfiguration,
 } from '@nx/devkit';
 import { createNodesFromFiles, DependencyType, validateDependency } from '@nx/devkit';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
@@ -309,7 +309,14 @@ function scanForIncludesWithCompiler(
           const sourceFile = join(projectRoot, relativeFilePath);
 
           for (const dep of deps) {
-            const normalizedDep = dep.replace(/\\/g, '/');
+            // Normalize paths: convert absolute paths to relative from project root
+            let normalizedDep = dep.replace(/\\/g, '/');
+
+            // If gcc returned an absolute path, make it relative to the project
+            if (normalizedDep.startsWith('/') || normalizedDep.includes(':/')) {
+              normalizedDep = relative(projectDir, normalizedDep);
+            }
+
             includes.set(normalizedDep, sourceFile);
           }
 
@@ -347,6 +354,38 @@ function scanForIncludes(
 }
 
 /**
+ * Finds which project owns a given file path
+ * Returns the project name or null if no project found
+ */
+function findProjectForFile(
+  filePath: string,
+  currentProjectRoot: string,
+  allProjects: Record<string, { root: string }>,
+  workspaceRoot: string
+): string | null {
+  // Resolve the include path to an absolute path
+  const currentProjectDir = join(workspaceRoot, currentProjectRoot);
+  const resolvedPath = join(currentProjectDir, filePath);
+
+  // Find the project with the longest matching root
+  let bestMatch: { name: string; rootLength: number } | null = null;
+
+  for (const [projectName, project] of Object.entries(allProjects)) {
+    const projectAbsPath = join(workspaceRoot, project.root);
+
+    // Check if the resolved file is within this project's root
+    if (resolvedPath.startsWith(projectAbsPath + '/') || resolvedPath.startsWith(projectAbsPath + '\\')) {
+      const rootLength = projectAbsPath.length;
+      if (!bestMatch || rootLength > bestMatch.rootLength) {
+        bestMatch = { name: projectName, rootLength };
+      }
+    }
+  }
+
+  return bestMatch?.name || null;
+}
+
+/**
  * Maps include paths to project names for dependency detection
  * Returns a map of target project names to the source files that include them
  */
@@ -358,37 +397,33 @@ function mapIncludesToProjectNames(
   workspaceRoot: string
 ): Map<string, string[]> {
   const projectDependencies = new Map<string, string[]>();
-  const projectDir = join(workspaceRoot, projectRoot);
 
   console.log(`[nx-make] Mapping ${includes.size} includes for "${projectName}" at root "${projectRoot}"`);
 
   for (const [includePath, sourceFile] of includes) {
-    // Handle relative includes pointing to other projects
-    // e.g., "../math-lib/math_ops.h" or "../other-project/header.h"
-    if (includePath.startsWith('../')) {
-      const parts = includePath.split('/');
-      if (parts.length >= 2) {
-        const potentialProjectDir = parts[1];
-        const siblingPath = join(dirname(projectDir), potentialProjectDir);
+    // Skip includes that are local to this project (don't start with ../)
+    if (!includePath.startsWith('../')) {
+      continue;
+    }
 
-        console.log(`[nx-make]   Include "${includePath}" → checking sibling path: ${siblingPath}`);
+    console.log(`[nx-make]   Include "${includePath}"`);
 
-        // Try to find which project owns this directory
-        for (const [otherProjectName, otherProject] of Object.entries(allProjects)) {
-          if (otherProjectName === projectName) continue;
+    // Find which project owns this included file
+    const owningProject = findProjectForFile(
+      includePath,
+      projectRoot,
+      allProjects,
+      workspaceRoot
+    );
 
-          const otherProjectAbsPath = join(workspaceRoot, otherProject.root);
-
-          if (siblingPath === otherProjectAbsPath) {
-            console.log(`[nx-make]     ✓ Matched project "${otherProjectName}" at ${otherProject.root}`);
-            if (!projectDependencies.has(otherProjectName)) {
-              projectDependencies.set(otherProjectName, []);
-            }
-            projectDependencies.get(otherProjectName)!.push(sourceFile);
-            break;
-          }
-        }
+    if (owningProject && owningProject !== projectName) {
+      console.log(`[nx-make]     ✓ Mapped to project "${owningProject}"`);
+      if (!projectDependencies.has(owningProject)) {
+        projectDependencies.set(owningProject, []);
       }
+      projectDependencies.get(owningProject)!.push(sourceFile);
+    } else {
+      console.log(`[nx-make]     ✗ No project found for include`);
     }
   }
 
