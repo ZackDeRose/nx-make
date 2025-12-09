@@ -618,8 +618,46 @@ function deriveProjectName(projectRoot: string): string {
 }
 
 /**
- * Detects if a project is a "bucket" project (has sub-projects but no source files)
- * Returns the names of sub-projects
+ * Checks if a directory has any source files
+ */
+function hasSourceFiles(projectDir: string): boolean {
+  if (!existsSync(projectDir)) {
+    return false;
+  }
+
+  try {
+    const entries = readdirSync(projectDir);
+
+    for (const entry of entries) {
+      if (EXCLUDE_DIRS.includes(entry)) {
+        continue;
+      }
+
+      const fullPath = join(projectDir, entry);
+      try {
+        const stat = statSync(fullPath);
+
+        // Check for source files (but not in subdirectories with Makefiles)
+        if (!stat.isDirectory()) {
+          const allSourceExtensions = [...CPP_SOURCE_EXTENSIONS, '.h', '.hpp', '.hh'];
+          if (allSourceExtensions.some(ext => entry.endsWith(ext))) {
+            return true; // Found a source file
+          }
+        }
+      } catch {
+        // Skip entries we can't access
+      }
+    }
+  } catch {
+    // Skip if can't read directory
+  }
+
+  return false;
+}
+
+/**
+ * Detects if a project is a pure "bucket" project (has sub-projects but NO source files)
+ * Returns the names of sub-projects only if it's a pure bucket
  */
 function findSubProjects(
   projectDir: string,
@@ -631,6 +669,16 @@ function findSubProjects(
     return subProjects;
   }
 
+  // First, check if this project has any source files
+  const hasSources = hasSourceFiles(projectDir);
+
+  if (hasSources) {
+    // Not a pure bucket - it has its own source files
+    // Don't create implicit dependencies on sub-projects
+    return subProjects;
+  }
+
+  // No source files found - check for sub-projects
   try {
     const entries = readdirSync(projectDir);
 

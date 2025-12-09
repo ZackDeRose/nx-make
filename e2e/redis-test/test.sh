@@ -173,6 +173,24 @@ else
   exit 1
 fi
 
+# Test 2c: Verify src is NOT a bucket project
+echo ""
+echo "Test 2c: Non-Bucket Project Validation"
+echo "---------------------------------------"
+echo "The 'src' project has its own source files + src-modules subdirectory"
+echo "It should NOT have implicit dependency on src-modules (it's not a pure bucket)"
+echo ""
+
+SRC_IMPLICIT=$(npx nx show project src --json 2>/dev/null | jq -r '.implicitDependencies[]?' 2>/dev/null)
+
+if echo "$SRC_IMPLICIT" | grep -q "src-modules"; then
+  echo "❌ FAILED: src incorrectly depends on src-modules (should not - src has its own files)"
+  exit 1
+else
+  echo "✅ CORRECT: src does NOT implicitly depend on src-modules"
+  echo "   (src is a regular project with source files, not a pure bucket)"
+fi
+
 # Test 3: Build a dependency
 echo ""
 echo "Test 3: Build Individual Dependency"
