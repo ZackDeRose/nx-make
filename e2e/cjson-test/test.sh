@@ -128,10 +128,10 @@ fi
 echo ""
 echo "Test 2: Target Discovery"
 echo "-------------------------"
-TARGETS=$(npx nx show project $PROJECT_NAME --json | grep -o '"[^"]*":{"executor":"nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
+TARGETS=$(npx nx show project $PROJECT_NAME --json | grep -o '"[^"]*":{"executor":"@zackderose/nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
 if [ -n "$TARGETS" ]; then
   echo "✅ Make targets discovered from Makefile"
-  npx nx show project $PROJECT_NAME --json | grep '"executor":"nx-make:make"' | head -5
+  npx nx show project $PROJECT_NAME --json | grep '"executor":"@zackderose/nx-make:make"' | head -5
 else
   echo "❌ No Make targets discovered"
   exit 1

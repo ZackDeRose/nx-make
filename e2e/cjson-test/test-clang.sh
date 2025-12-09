@@ -7,11 +7,11 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TEST_DIR="$SCRIPT_DIR/workspace-clang"
+TEST_DIR="$SCRIPT_DIR/workspace"
 CJSON_COMMIT="v1.7.18"
 
-echo "🧪 E2E Test: nx-make with cJSON library (CLANG MODE)"
-echo "======================================================"
+echo "🧪 E2E Test: nx-make with cJSON library"
+echo "=========================================="
 echo ""
 
 # Clean up any previous test run
@@ -46,11 +46,11 @@ echo "y" | bash /tmp/install-local.sh || {
 
   # Fallback: ensure package.json and nx are installed
   if [ ! -f "package.json" ]; then
-    pnpm init -y
+    pnpm init
   fi
 
   if [ ! -d "node_modules/nx" ]; then
-    pnpm add -D "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
+    pnpm add -D -w "nx@>=22.0.0" "file:$WORKSPACE_ROOT/packages/nx-make"
   fi
 
   if [ ! -f "nx.json" ]; then
@@ -69,25 +69,6 @@ NXJSON
 
 # Clean up temp file
 rm -f /tmp/install-local.sh
-
-# Override nx.json to use clang
-echo "⚙️  Reconfiguring for clang compiler..."
-cat > nx.json << 'NXJSON'
-{
-  "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "plugins": [
-    {
-      "plugin": "nx-make",
-      "options": {
-        "dependencyCompiler": "clang"
-      }
-    }
-  ]
-}
-NXJSON
-
-# Reset cache with new config
-npx nx reset 2>&1 | grep -E "NX|Success" || true
 
 echo ""
 echo "✅ Test workspace setup complete!"
@@ -147,10 +128,10 @@ fi
 echo ""
 echo "Test 2: Target Discovery"
 echo "-------------------------"
-TARGETS=$(npx nx show project $PROJECT_NAME --json | grep -o '"[^"]*":{"executor":"nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
+TARGETS=$(npx nx show project $PROJECT_NAME --json | grep -o '"[^"]*":{"executor":"@zackderose/nx-make:make"' | grep -o '"[^"]*"' | head -1 | tr -d '"')
 if [ -n "$TARGETS" ]; then
   echo "✅ Make targets discovered from Makefile"
-  npx nx show project $PROJECT_NAME --json | grep '"executor":"nx-make:make"' | head -5
+  npx nx show project $PROJECT_NAME --json | grep '"executor":"@zackderose/nx-make:make"' | head -5
 else
   echo "❌ No Make targets discovered"
   exit 1

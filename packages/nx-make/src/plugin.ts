@@ -227,6 +227,12 @@ function scanForIncludesManual(projectDir: string, projectRoot: string): Map<str
         }
 
         if (stat.isDirectory()) {
+          // Stop scanning if this subdirectory has its own Makefile
+          // (it's a separate project with its own boundaries)
+          const subMakefile = join(fullPath, 'Makefile');
+          if (existsSync(subMakefile)) {
+            continue; // Don't recurse into sub-projects
+          }
           scanDirectory(fullPath);
         } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext)) || entry.endsWith('.h') || entry.endsWith('.hpp')) {
           try {
@@ -288,6 +294,12 @@ function scanForIncludesWithCompiler(
         }
 
         if (stat.isDirectory()) {
+          // Stop scanning if this subdirectory has its own Makefile
+          // (it's a separate project with its own boundaries)
+          const subMakefile = join(fullPath, 'Makefile');
+          if (existsSync(subMakefile)) {
+            continue; // Don't recurse into sub-projects
+          }
           scanDirectory(fullPath);
         } else if (CPP_SOURCE_EXTENSIONS.some(ext => entry.endsWith(ext))) {
           if (maxFiles && filesProcessed >= maxFiles) return;
@@ -348,6 +360,8 @@ function mapIncludesToProjectNames(
   const projectDependencies = new Map<string, string[]>();
   const projectDir = join(workspaceRoot, projectRoot);
 
+  console.log(`[nx-make] Mapping ${includes.size} includes for "${projectName}" at root "${projectRoot}"`);
+
   for (const [includePath, sourceFile] of includes) {
     // Handle relative includes pointing to other projects
     // e.g., "../math-lib/math_ops.h" or "../other-project/header.h"
@@ -355,19 +369,18 @@ function mapIncludesToProjectNames(
       const parts = includePath.split('/');
       if (parts.length >= 2) {
         const potentialProjectDir = parts[1];
+        const siblingPath = join(dirname(projectDir), potentialProjectDir);
+
+        console.log(`[nx-make]   Include "${includePath}" → checking sibling path: ${siblingPath}`);
 
         // Try to find which project owns this directory
         for (const [otherProjectName, otherProject] of Object.entries(allProjects)) {
           if (otherProjectName === projectName) continue;
 
           const otherProjectAbsPath = join(workspaceRoot, otherProject.root);
-          const siblingPath = join(dirname(projectDir), potentialProjectDir);
 
-          if (
-            existsSync(siblingPath) &&
-            statSync(siblingPath).isDirectory() &&
-            siblingPath === otherProjectAbsPath
-          ) {
+          if (siblingPath === otherProjectAbsPath) {
+            console.log(`[nx-make]     ✓ Matched project "${otherProjectName}" at ${otherProject.root}`);
             if (!projectDependencies.has(otherProjectName)) {
               projectDependencies.set(otherProjectName, []);
             }
@@ -589,6 +602,9 @@ export const createDependencies: CreateDependencies<MakePluginOptions> = (
     const includes = scanForIncludes(projectAbsPath, projectRoot, context.workspaceRoot, options);
 
     console.log(`[nx-make] Project "${projectName}": found ${includes.size} total includes`);
+    if (includes.size > 0 && projectName === 'hello-world') {
+      console.log(`[nx-make]   Includes:`, Array.from(includes.keys()).slice(0, 5));
+    }
 
     // Map include paths to actual project dependencies
     const projectDependencies = mapIncludesToProjectNames(
